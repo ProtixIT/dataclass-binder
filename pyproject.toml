@@ -23,6 +23,7 @@ tomli = {version = "^2.0.1", python = "<3.11"}
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.20.0"
+mypy = "^0.991"
 
 [tool.black]
 line-length = 120
@@ -32,6 +33,21 @@ target-version = ["py310"]
 profile = "black"
 multi_line_output = 3
 line_length = 120
+
+[tool.mypy]
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+no_implicit_reexport = true
+pretty = true
+show_error_codes = true
+strict_equality = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true
+warn_unused_ignores = true
 
 [build-system]
 requires = ["poetry-core"]
