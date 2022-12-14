@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "dataclass-binder"
+version = "0.1.0"
+description = "Library to bind TOML data to Python dataclasses in a type-safe way."
+authors = [
+    "Maarten ter Huurne <maarten.terhuurne@protix.eu>",
+]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/ProtixIT/dataclass-binder"
+keywords = ["dataclass", "toml", "bind", "binding"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+[tool.poetry.urls]
+"Issue Tracker" = "https://github.com/ProtixIT/dataclass-binder/issues"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+tomli = {version = "^2.0.1", python = "<3.11"}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
