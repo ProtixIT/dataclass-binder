@@ -3,6 +3,99 @@
 Library to bind TOML data to Python dataclasses in a type-safe way.
 
 
+## Features
+
+Currently it has the following properties that might set it apart from other data binding libraries:
+
+- requires Python 3.10+
+- relies only on dataclasses from the Python standard library
+- detailed error messages which mention location, expected data and actual data
+- strict parsing which considers unknown keys to be errors
+- support for durations (`timedelta`)
+- support for immutable (frozen) dataclasses
+- can bind data from files, I/O streams or pre-parsed dictionaries
+- can generate configuration templates from dataclass definitions
+
+This library was originally designed for parsing configuration files.
+As TOML's data model is very similar to JSON's, adding support for JSON in the future would be an option and would make the library useful for binding HTTP API requests.
+
+
+## Maturity
+
+This library is fully type-checked, has unit tests which provide 100% branch coverage and is used in production, so it should be reliable.
+
+The API might still change in incompatible ways until the 1.0 release.
+In particular the following aspects are subject to change:
+
+- use of key suffixes for `timedelta`: this mechanism doesn't work for arrays
+- the handling of separators in keys: currently `-` in TOML is mapped to `_` in Python and `_` is forbidden in TOML; most applications seem to accept both `-` and `_` in TOML instead
+
+
+## Why Dataclasses?
+
+A typical TOML, JSON or YAML parser returns the parse results as a nested dictionary.
+You might wonder why you would want to use a data binding library rather than just getting the values directly from that dictionary.
+
+Let's take the following example code for a service that connects to a database using a connection URL configured in a TOML file:
+
+```py
+import tomllib  # or 'tomli' on Python <3.11
+
+
+def read_config() -> dict:
+    with open("config.toml", "rb") as f:
+        config = tomllib.load(f)
+    return config
+
+def handle_request(config: dict) -> None:
+    url = config["database-url"]
+    print("connect to database:", url)
+
+config = read_config()
+...
+handle_request(config)
+```
+
+If the configuration is missing a `database-url` key or its value is not a string, this service would start up without complaints and then fail when the first requests comes in.
+It would be better to instead check the configuration on startup, so let's add code for that:
+
+```py
+def read_config():
+    with open("config.toml", "rb") as f:
+        config = tomllib.load(f)
+
+    url = config["database-url"]
+    if not isinstance(url, str):
+        raise TypeError(
+            f"Value for 'database-url' has type '{type(url).__name__}', expected 'str'"
+        )
+
+    return config
+```
+
+Imagine you have 20 different configurable options: you'd need this code 20 times.
+
+Now let's assume that you use a type checker like `mypy`.
+Inside `read_config()`, the type checker will know that `url` is a `str`, but if you fetch the same value elsewhere in the code, that information is lost:
+
+```py
+def handle_request(config: dict) -> None:
+    url = config["database-url"]
+    reveal_type(url)
+    print("connect to database:", url)
+```
+
+When you run `mypy` on this code, it will output 'Revealed type is "Any"'.
+Falling back to `Any` means type checking will not be able to find type mismatches and autocomplete in an IDE will not work well either.
+
+Declaring the desired type in a dataclass solves both these issues:
+- the type can be verified at runtime before instantiating the dataclass
+- tooling knows the type when you read the value from the dataclass
+
+Having the dataclass as a central and formal place for defining the configuration format is also an advantage.
+For example, it enables automatic generation of a documented configuration file template.
+
+
 ## Usage
 
 The `dataclass_binder` module contains the `Binder` class which makes it easy to bind TOML data, such as a configuration file, to Python [dataclasses](https://docs.python.org/3/library/dataclasses.html).
@@ -32,6 +125,28 @@ if __name__ == "__main__":
         sys.exit(1)
 ```
 
+### Binding a Pre-parsed Dictionary
+
+If you don't want to bind the contents of a full file, there is also the option to bind a pre-parsed dictionary instead.
+For this, you can use the `bind()` method on the specialized `Binder` class.
+
+For example, the following service uses a hybrid configuration format where a single file configures both the service itself and logging system:
+
+```py
+import logging.config
+
+import tomllib  # or 'tomli' on Python <3.11
+from dataclass_binder import Binder
+
+
+with open("config.toml", "rb") as f:
+    config = tomllib.load(f)
+service_config = Binder[ServiceConfig].bind(config["service"])
+logging.config.dictConfig(config["logging"])
+```
+
+To keep these examples short, from now on `import` statements will only be included the first time a particular imported name is used.
+
 ### Basic Types
 
 Dataclass fields correspond to TOML keys. In the dataclass, underscores are used as word separators, while dashes are used in the TOML file. For example, the following TOML fragment:
@@ -51,8 +166,6 @@ class Config:
     database_url: str
     port: int
 ```
-
-To keep these examples short, from now on `import` statements will only be included the first time a particular imported name is used.
 
 Fields can be made optional by assigning a default value. Using `None` as a default value is allowed too:
 
@@ -197,6 +310,69 @@ from collections.abc import Mapping, Sequence
 class Config:
     tags: Sequence[str] = ()
     limits: Mapping[str, int]
+```
+
+### Generating a Configuration Template
+
+To provide users with a starting point for configuring your application/service, you can automatically generate a configuration template from the information in the dataclass.
+
+For example, when the following dataclass defines your configuration:
+
+```py
+@dataclass
+class Config:
+    database_url: str
+    """The URL of the database to connect to."""
+
+    port: int = 12345
+    """TCP port on which to accept connections."""
+```
+
+You can generate a template configuration file using:
+
+```py
+from dataclass_binder import format_template
+
+
+for line in format_template(Config):
+    print(line)
+```
+
+Which will print:
+
+```toml
+# The URL of the database to connect to.
+# Mandatory.
+database-url = '???'
+
+# TCP port on which to accept connections.
+# Default:
+# port = 12345
+```
+
+It is also possible to provide placeholder values by passing a dataclass instance rather than the dataclass itself to `format_template()`:
+
+```py
+TEMPLATE = Config(
+    database_url="postgresql://<username>:<password>@<hostname>/<database name>",
+    port=8080,
+)
+
+for line in format_template(TEMPLATE):
+    print(line)
+```
+
+Which will print:
+
+```toml
+# The URL of the database to connect to.
+# Mandatory.
+database-url = 'postgresql://<username>:<password>@<hostname>/<database name>'
+
+# TCP port on which to accept connections.
+# Default:
+# port = 12345
+port = 8080
 ```
 
 ### Troubleshooting
