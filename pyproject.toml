@@ -25,6 +25,7 @@ tomli = {version = "^2.0.1", python = "<3.11"}
 pre-commit = "^2.20.0"
 mypy = "^0.991"
 pytest = "^7.2.0"
+pytest-cov = "^4.0.0"
 
 [tool.black]
 line-length = 120
@@ -49,6 +50,26 @@ warn_return_any = true
 warn_unreachable = true
 warn_unused_configs = true
 warn_unused_ignores = true
+
+[tool.coverage.run]
+branch = true
+source = ["dataclass_binder"]
+
+[tool.coverage.report]
+exclude_lines = [
+    # Explicit override:
+    "pragma: no cover",
+    # Intended to be unreachable:
+    "raise NotImplementedError$",
+    "raise NotImplementedError\\(",
+    "assert False$",
+    "assert False,",
+    # Debug-only code:
+    "def __repr__\\(",
+    # Exclusive to mypy:
+    "if TYPE_CHECKING:$",
+    "\\.\\.\\.$",
+]
 
 [build-system]
 requires = ["poetry-core"]
