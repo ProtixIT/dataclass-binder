@@ -1,2 +1,5 @@
+# Cached compiled Python modules.
+__pycache__/
+
 # Don't archive dependency locks: we want to test against the latest versions.
 /poetry.lock
