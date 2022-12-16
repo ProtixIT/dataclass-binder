@@ -17,7 +17,7 @@ from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
 from pathlib import Path
 from textwrap import dedent
 from types import ModuleType, NoneType, UnionType
-from typing import IO, Any, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin
+from typing import Any, BinaryIO, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin
 from weakref import WeakKeyDictionary
 
 if sys.version_info < (3, 11):
@@ -347,7 +347,7 @@ class Binder(Generic[T]):
         return cls._bind_to_class(data, cls._get_config_class().__name__)
 
     @classmethod
-    def parse_toml(cls, file: IO[bytes] | str | Path) -> T:
+    def parse_toml(cls, file: BinaryIO | str | Path) -> T:
         match file:
             case Path() | str():
                 with open(file, "rb") as stream:

@@ -8,7 +8,7 @@ from datetime import date, datetime, time, timedelta
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType
-from typing import IO, Any, Generic, TypeVar
+from typing import Any, BinaryIO, Generic, TypeVar
 
 from pytest import raises
 
@@ -21,7 +21,7 @@ T = TypeVar("T")
 
 
 @contextmanager
-def stream_text(text: str) -> Iterator[IO[bytes]]:
+def stream_text(text: str) -> Iterator[BinaryIO]:
     stream = BytesIO(text.encode())
     try:
         yield stream
