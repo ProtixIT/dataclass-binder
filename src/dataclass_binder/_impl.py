@@ -7,6 +7,7 @@ from __future__ import annotations
 import ast
 import operator
 import re
+import sys
 from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
 from dataclasses import MISSING, Field, fields, is_dataclass
 from datetime import date, datetime, time, timedelta
@@ -19,10 +20,10 @@ from types import ModuleType, NoneType, UnionType
 from typing import IO, Any, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin
 from weakref import WeakKeyDictionary
 
-try:
-    import tomllib  # type: ignore[import]
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
+if sys.version_info < (3, 11):
+    import tomli as tomllib
+else:
+    import tomllib
 
 
 def _collect_type(field_type: type, context: str) -> type:
