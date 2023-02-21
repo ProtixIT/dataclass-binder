@@ -1,6 +1,9 @@
 # Cached compiled Python modules.
 __pycache__/
 
+# Build output.
+/dist
+
 # Coverage results.
 /.coverage
 
