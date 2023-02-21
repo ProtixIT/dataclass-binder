@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dataclass-binder"
-version = "0.1.0"
+version = "0.0.0"
 description = "Library to bind TOML data to Python dataclasses in a type-safe way."
 authors = [
     "Maarten ter Huurne <maarten.terhuurne@protix.eu>",

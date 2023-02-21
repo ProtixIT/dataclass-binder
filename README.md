@@ -400,6 +400,13 @@ After you first set up your virtual environment with Poetry, run this command to
     $ pre-commit install
 
 
+## Release Procedure
+
+- Verify that CI passes on the branch that you want to release (typically `main`)
+- Create a release on the GitHub web interface; name the tag `v<major>.<minor>.<patchlevel>`
+- After publishing the release on GitHub, the package will be built and published on PyPI automatically via Actions
+
+
 ## Changelog
 
 ### 0.1.0 - 2023-02-21:
