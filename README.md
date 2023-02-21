@@ -102,7 +102,7 @@ The `dataclass_binder` module contains the `Binder` class which makes it easy to
 
 The binding is a two-step process:
 - specialize the `Binder` class by using your top-level dataclass as a type argument
-- call the `parse_toml()` method, providing an I/O stream for the configuration file as its argument
+- call the `parse_toml()` method, providing the path of the configuration file as its argument
 
 Put together, the code looks like this:
 
@@ -149,14 +149,14 @@ To keep these examples short, from now on `import` statements will only be inclu
 
 ### Basic Types
 
-Dataclass fields correspond to TOML keys. In the dataclass, underscores are used as word separators, while dashes are used in the TOML file. For example, the following TOML fragment:
+Dataclass fields correspond to TOML keys. In the dataclass, underscores are used as word separators, while dashes are used in the TOML file. Let's configure a service that listens on a TCP port for requests and stores its data in a database, using the following TOML fragment:
 
 ```toml
 database-url = 'postgresql://user:password@host/db'
 port = 5432
 ```
 
-can be bound to the following dataclass:
+This configuration can be bound to the following dataclass:
 
 ```py
 from dataclasses import dataclass
@@ -251,7 +251,7 @@ class Config:
 
 The extra keys (`url` and `token` in this example) provide the clarity:
 
-```
+```toml
 webhooks = [
     {url = "https://host1/notify", token = "12345"},
     {url = "https://host2/hook", token = "frperg"}
@@ -260,7 +260,7 @@ webhooks = [
 
 TOML's array-of-tables syntax can make this configuration a bit easier on the eyes:
 
-```
+```toml
 [[webhooks]]
 url = "https://host1/notify"
 token = "12345"
@@ -404,4 +404,4 @@ After you first set up your virtual environment with Poetry, run this command to
 
 ### 0.1.0 - 2023-02-21:
 
-- First open source release
+- First open source release; thanks to my employer [Protix](https://protix.eu/) for making this possible
