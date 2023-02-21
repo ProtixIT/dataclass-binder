@@ -398,3 +398,10 @@ These hooks automatically run a few simple checks and cleanups when you create a
 After you first set up your virtual environment with Poetry, run this command to install the pre-commit hooks:
 
     $ pre-commit install
+
+
+## Changelog
+
+### 0.1.0 - 2023-02-21:
+
+- First open source release
