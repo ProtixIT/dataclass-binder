@@ -29,7 +29,7 @@ jobs:
         run: poetry build
       - name: Publish on PyPI
         run: |
-          poetry config repositories.pypi https://test.pypi.org/legacy/
+          poetry config repositories.pypi https://upload.pypi.org/legacy/
           poetry publish -r pypi
         env:
           POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_UPLOAD_TOKEN }}
