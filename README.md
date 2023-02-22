@@ -412,3 +412,7 @@ After you first set up your virtual environment with Poetry, run this command to
 ### 0.1.0 - 2023-02-21:
 
 - First open source release; thanks to my employer [Protix](https://protix.eu/) for making this possible
+
+### 0.1.1 - 2023-02-22:
+
+- Relax `Binder.bind()` argument type to `Mapping`

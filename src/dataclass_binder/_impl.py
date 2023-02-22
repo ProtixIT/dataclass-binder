@@ -310,7 +310,7 @@ class Binder(Generic[T]):
             return cls._bind_to_single_type(value, field_type, context)
 
     @classmethod
-    def _bind_to_class(cls: type[Binder[T]], toml_dict: dict[str, Any], context: str) -> T:
+    def _bind_to_class(cls: type[Binder[T]], toml_dict: Mapping[str, Any], context: str) -> T:
         field_types = cls._field_types
         parsed = {}
         for key, value in toml_dict.items():
@@ -343,7 +343,7 @@ class Binder(Generic[T]):
         return cls._get_config_class()(**parsed)
 
     @classmethod
-    def bind(cls, data: dict[str, Any]) -> T:
+    def bind(cls, data: Mapping[str, Any]) -> T:
         return cls._bind_to_class(data, cls._get_config_class().__name__)
 
     @classmethod
