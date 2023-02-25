@@ -21,9 +21,9 @@ from typing import Any, BinaryIO, ClassVar, Generic, TypeVar, Union, cast, get_a
 from weakref import WeakKeyDictionary
 
 if sys.version_info < (3, 11):
-    import tomli as tomllib
+    import tomli as tomllib  # pragma: no cover
 else:
-    import tomllib
+    import tomllib  # pragma: no cover
 
 
 def _collect_type(field_type: type, context: str) -> type:
