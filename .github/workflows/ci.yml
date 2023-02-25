@@ -52,4 +52,59 @@ jobs:
         continue-on-error: true
       - name: Run unit tests
         run: poetry run pytest --cov=. --cov-config=pyproject.toml
+        env:
+          COVERAGE_FILE: ".coverage.${{ matrix.python-version }}"
         continue-on-error: true
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-data
+          path: .coverage.${{ matrix.python-version }}
+          retention-days: 7
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: testing
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - name: Set up Python (latest)
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+          # When combining under 3.11, decorators are reported as partially covered.
+          # The symptoms look similar to this older issue:
+          #   https://github.com/nedbat/coveragepy/issues/866
+      - name: Cache Poetry installation
+        id: cached-poetry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.local/bin/poetry
+            ~/.local/venv/
+          key: poetry
+      - name: Cache pip data
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip/
+          key: pip
+      - name: Install dev dependencies
+        run: poetry install --only=dev
+      - name: Download coverage data.
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-data
+      - name: Combine coverage data
+        run: poetry run coverage combine
+      - name: Generate HTML coverage report
+        run: poetry run coverage html --skip-covered --skip-empty
+      - name: Fail if coverage is not 100%
+        run: poetry run coverage report --fail-under=100
+      - name: Upload HTML report if check failed.
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: htmlcov
+        if: ${{ failure() }}
