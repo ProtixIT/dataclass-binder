@@ -90,8 +90,8 @@ jobs:
         with:
           path: ~/.cache/pip/
           key: pip
-      - name: Install dev dependencies
-        run: poetry install --only=dev
+      - name: Install coverage tool
+        run: poetry install --only=coverage
       - name: Download coverage data.
         uses: actions/download-artifact@v3
         with:
