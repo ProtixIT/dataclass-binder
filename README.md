@@ -415,8 +415,8 @@ After you first set up your virtual environment with Poetry, run this command to
 
 ### 0.1.1 - 2023-02-22:
 
-- Relax `Binder.bind()` argument type to `Mapping` (#3)
+- Relax `Binder.bind()` argument type to `Mapping` ([#3](https://github.com/ProtixIT/dataclass-binder/issues/3))
 
 ### 0.1.2 - 2023-03-03:
 
-- Fix `get()` and `[]` on object bound to read-only mapping (#6)
+- Fix `get()` and `[]` on object bound to read-only mapping ([#6](https://github.com/ProtixIT/dataclass-binder/issues/6))
