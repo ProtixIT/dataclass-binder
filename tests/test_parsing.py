@@ -492,6 +492,24 @@ def test_bind_mapping_ok() -> None:
     assert dict(config.magic_numbers) == {"the-answer": 42, "the-beast": 666, "haxor": 1337}
 
 
+def test_bind_mapping_access() -> None:
+    """Bound Mappings support read-only access."""
+    with stream_text(
+        """
+        magic-numbers = {the-answer = 42, "the-beast" = 666, haxor = 1337}
+        """
+    ) as stream:
+        config = Binder[MappingConfig].parse_toml(stream)
+
+    assert isinstance(config.magic_numbers, Mapping)
+    assert config.magic_numbers.get("the-answer") == 42
+    assert config.magic_numbers["the-beast"] == 666
+    assert config.magic_numbers.get("missingno") is None
+
+    with raises(TypeError):
+        config.magic_numbers["suitcase"] = 12345  # type: ignore[index]
+
+
 def test_bind_mapping_nontable() -> None:
     """TypeError is raised when the value for a mapping field is not a table."""
 
