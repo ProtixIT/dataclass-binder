@@ -16,7 +16,7 @@ from importlib import import_module
 from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
 from pathlib import Path
 from textwrap import dedent
-from types import ModuleType, NoneType, UnionType
+from types import MappingProxyType, ModuleType, NoneType, UnionType
 from typing import Any, BinaryIO, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin
 from weakref import WeakKeyDictionary
 
@@ -245,7 +245,7 @@ class Binder(Generic[T]):
             key_type, elem_type = get_args(field_type)
             mapping = {key: cls._bind_to_field(elem, elem_type, f'{context}["{key}"]') for key, elem in value.items()}
             return (
-                (mapping if isinstance(origin, MutableMapping) else mapping.items())
+                (mapping if isinstance(origin, MutableMapping) else MappingProxyType(mapping))
                 if isabstract(origin)
                 else field_type(mapping)
             )
