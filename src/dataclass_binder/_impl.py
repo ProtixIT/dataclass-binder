@@ -1,6 +1,4 @@
-"""
-TODO: Ignore fields with init=False.
-"""
+"""Implementation module."""
 
 from __future__ import annotations
 
@@ -161,8 +159,24 @@ def _get_fields(cls: type) -> Iterator[tuple[str, type]]:
 
     This includes fields inherited from superclasses.
     """
+
+    fields_by_name = {field.name: field for field in fields(cls)}
+
+    # Note: getmodule() can return None, but the end result is still fine.
+    cls_globals = getattr(getmodule(cls), "__dict__", {})
+    cls_locals = vars(cls)
+
     for field_container in reversed(cls.__mro__):
-        yield from get_annotations(field_container, eval_str=True).items()
+        for name, annotation in get_annotations(field_container).items():
+            field = fields_by_name[name]
+            if not field.init:
+                continue
+            if isinstance(annotation, str):
+                try:
+                    annotation = eval(annotation, cls_globals, cls_locals)
+                except NameError as ex:
+                    raise TypeError(f"Failed to parse annotation of field '{cls.__name__}.{name}': {ex}") from None
+            yield name, annotation
 
 
 _TIMEDELTA_SUFFIXES = {"days", "seconds", "microseconds", "milliseconds", "minutes", "hours", "weeks"}
@@ -562,6 +576,9 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
 
     first = True
     for field in fields(config_class):
+        if not field.init:
+            continue
+
         if first:
             first = False
         else:
