@@ -893,9 +893,12 @@ def test_specialize_annotation_nested_scope() -> None:
 def test_specialize_excluded_from_init() -> None:
     """Fields with `init=False` are ignored at specialization."""
 
+    class CustomType:
+        pass
+
     @dataclass
     class Config:
-        unsupported: Exception = field(init=False)
+        unsupported: CustomType = field(init=False)
 
     Binder[Config]
 
@@ -917,5 +920,6 @@ def test_bind_excluded_from_init() -> None:
     assert config.total == 10
 
     with stream_text("total = 9001") as stream:
-        with raises(TypeError, match=r"unexpected keyword argument 'total'"):
+        # TODO: Refine error message: the field does exist, but it's excluded.
+        with raises(ValueError, match=r"^Field 'SumConfig\.total' does not exist$"):
             Binder[SumConfig].parse_toml(stream)
