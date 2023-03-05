@@ -869,6 +869,27 @@ def test_bind_dataclass_in_sequence() -> None:
     assert config.trends[1].trend_identifier == "uprising attempts"
 
 
+def test_specialize_annotation_nested_scope() -> None:
+    """
+    Handle an annotation using a name from a nested scope gracefully.
+
+    Python does not record nested scopes for class definitions.
+    This means we have no way of resolving names from nested scopes used in annotations.
+    All we can do is report the problem field.
+    """
+
+    @dataclass
+    class Hidden:
+        pass
+
+    @dataclass
+    class Config:
+        hidden: Hidden
+
+    with raises(TypeError, match=r"^Failed to parse annotation of field 'Config\.hidden': "):
+        Binder[Config]
+
+
 def test_specialize_excluded_from_init() -> None:
     """Fields with `init=False` are ignored at specialization."""
 

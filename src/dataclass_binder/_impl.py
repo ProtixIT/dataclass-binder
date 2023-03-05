@@ -159,8 +159,19 @@ def _get_fields(cls: type) -> Iterator[tuple[str, type]]:
 
     This includes fields inherited from superclasses.
     """
+
+    # Note: getmodule() can return None, but the end result is still fine.
+    cls_globals = getattr(getmodule(cls), "__dict__", {})
+    cls_locals = vars(cls)
+
     for field_container in reversed(cls.__mro__):
-        yield from get_annotations(field_container, eval_str=True).items()
+        for name, annotation in get_annotations(field_container).items():
+            if isinstance(annotation, str):
+                try:
+                    annotation = eval(annotation, cls_globals, cls_locals)
+                except NameError as ex:
+                    raise TypeError(f"Failed to parse annotation of field '{cls.__name__}.{name}': {ex}") from None
+            yield name, annotation
 
 
 _TIMEDELTA_SUFFIXES = {"days", "seconds", "microseconds", "milliseconds", "minutes", "hours", "weeks"}
