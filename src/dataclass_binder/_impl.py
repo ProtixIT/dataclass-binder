@@ -1,6 +1,4 @@
-"""
-TODO: Ignore fields with init=False.
-"""
+"""Implementation module."""
 
 from __future__ import annotations
 
@@ -562,6 +560,9 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
 
     first = True
     for field in fields(config_class):
+        if not field.init:
+            continue
+
         if first:
             first = False
         else:

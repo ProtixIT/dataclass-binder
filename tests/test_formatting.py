@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
 from types import ModuleType
@@ -204,6 +204,9 @@ class TemplateConfig:
     """
 
     multi_type: str | int
+
+    derived: int = field(init=False)
+    """Excluded field."""
 
     bad_annotation: NoSuchType  # type: ignore[name-defined]  # noqa
 

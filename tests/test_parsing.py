@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import FrozenInstanceError, dataclass
+from dataclasses import FrozenInstanceError, dataclass, field
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
 from pathlib import Path
@@ -867,3 +867,34 @@ def test_bind_dataclass_in_sequence() -> None:
     assert len(config.trends) == 2
     assert config.trends[0].trend_identifier == "uprising risk"
     assert config.trends[1].trend_identifier == "uprising attempts"
+
+
+def test_specialize_excluded_from_init() -> None:
+    """Fields with `init=False` are ignored at specialization."""
+
+    @dataclass
+    class Config:
+        unsupported: Exception = field(init=False)
+
+    Binder[Config]
+
+
+def test_bind_excluded_from_init() -> None:
+    """Fields with `init=False` are ignored during binding."""
+
+    @dataclass(frozen=True)
+    class SumConfig:
+        values: Sequence[int] = ()
+        total: int = field(init=False)
+
+        def __post_init__(self) -> None:
+            super().__setattr__("total", sum(self.values))
+
+    with stream_text("values = [1, 2, 3, 4]") as stream:
+        config = Binder[SumConfig].parse_toml(stream)
+
+    assert config.total == 10
+
+    with stream_text("total = 9001") as stream:
+        with raises(TypeError, match=r"unexpected keyword argument 'total'"):
+            Binder[SumConfig].parse_toml(stream)
