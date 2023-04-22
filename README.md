@@ -153,7 +153,7 @@ Dataclass fields correspond to TOML keys. In the dataclass, underscores are used
 
 ```toml
 database-url = 'postgresql://user:password@host/db'
-port = 5432
+port = 8080
 ```
 
 This configuration can be bound to the following dataclass:
