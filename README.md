@@ -165,7 +165,13 @@ from dataclasses import dataclass
 class Config:
     database_url: str
     port: int
+    verbose: bool
 ```
+
+The `float` type can be used to bind floating point numbers.
+Support for `Decimal` is not there at the moment but would be relatively easy to add, as `tomllib`/`tomli` has an option for that.
+
+### Defaults
 
 Fields can be made optional by assigning a default value. Using `None` as a default value is allowed too:
 
@@ -176,8 +182,15 @@ class Config:
     webhook_url: str | None = None
 ```
 
-The `float` type can be used to bind floating point numbers.
-Support for `Decimal` is not there at the moment but would be relatively easy to add, as `tomllib`/`tomli` has an option for that.
+If you want to mix fields with and without defaults in any order, mark the fields as keyword-only:
+
+```py
+@dataclass(kw_only=True)
+class Config:
+    database_url: str
+    verbose: bool = False
+    port: int
+```
 
 ### Dates and Times
 
