@@ -46,15 +46,12 @@ jobs:
         run: poetry install
       - name: Run pre-commit checks
         run: poetry run pre-commit run --all
-        continue-on-error: true
       - name: Run mypy
         run: poetry run mypy src/ tests/
-        continue-on-error: true
       - name: Run unit tests
         run: poetry run pytest --cov=. --cov-config=pyproject.toml
         env:
           COVERAGE_FILE: ".coverage.${{ matrix.python-version }}"
-        continue-on-error: true
       - name: Upload coverage data
         uses: actions/upload-artifact@v3
         with:
