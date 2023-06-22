@@ -37,7 +37,7 @@ def _collect_type(field_type: type, context: str) -> type:
     if origin is None:
         if not isinstance(field_type, type):
             raise TypeError(f"Annotation for field '{context}' is not a type")
-        elif issubclass(field_type, (str, int, float, date, time, timedelta, ModuleType)):
+        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType):
             return field_type
         elif field_type is type:
             # https://github.com/python/mypy/issues/12392
@@ -63,7 +63,7 @@ def _collect_type(field_type: type, context: str) -> type:
         try:
             key_type, value_type = type_args
         except ValueError:
-            raise TypeError(f"Mapping '{context}' must have two type arguments")
+            raise TypeError(f"Mapping '{context}' must have two type arguments") from None
         if key_type is not str:
             raise TypeError(f"Mapping '{context}' has key type '{key_type.__name__}', expected 'str'")
         return origin[(key_type, _collect_type(value_type, f"{context}[]"))]  # type: ignore[no-any-return]
@@ -146,7 +146,7 @@ def _find_field(full_name: str, field_names: Collection[str]) -> tuple[str, str 
     try:
         name, suffix = full_name.rsplit("_", 1)
     except ValueError:
-        raise KeyError(full_name)
+        raise KeyError(full_name) from None
     if name in field_names:
         return name, suffix
     else:
@@ -173,7 +173,7 @@ def _get_fields(cls: type) -> Iterator[tuple[str, type]]:
                 continue
             if isinstance(annotation, str):
                 try:
-                    annotation = eval(annotation, cls_globals, cls_locals)
+                    annotation = eval(annotation, cls_globals, cls_locals)  # noqa: PGH001
                 except NameError as ex:
                     raise TypeError(f"Failed to parse annotation of field '{cls.__name__}.{name}': {ex}") from None
             yield name, annotation
@@ -250,7 +250,7 @@ class Binder(Generic[T]):
             elif issubclass(field_type, Binder):
                 if not isinstance(value, dict):
                     raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
-                return field_type._bind_to_class(value, context)
+                return field_type._bind_to_class(value, context)  # noqa: SLF001
             elif isinstance(value, field_type) and (type(value) is not bool or field_type is bool):
                 return value
         elif issubclass(origin, Mapping):
@@ -271,7 +271,7 @@ class Binder(Generic[T]):
                 if len(type_args) == len(value):
                     return tuple(
                         cls._bind_to_field(elem, elem_type, f"{context}[{index}]")
-                        for index, (elem, elem_type) in enumerate(zip(value, type_args))
+                        for index, (elem, elem_type) in enumerate(zip(value, type_args, strict=True))
                     )
                 else:
                     raise TypeError(f"Expected {len(type_args)} elements for '{context}', got {len(value)}")
@@ -298,7 +298,7 @@ class Binder(Generic[T]):
                 )
         else:
             # This is currently unreachable because we reject unsupported generic types in _collect_type().
-            assert False
+            raise AssertionError(origin)
 
         raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected '{field_type.__name__}'")
 
@@ -339,7 +339,7 @@ class Binder(Generic[T]):
             field_type = field_types[field_name]
             if suffix is not None:
                 if field_type is timedelta and suffix in _TIMEDELTA_SUFFIXES:
-                    if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    if isinstance(value, int | float) and not isinstance(value, bool):
                         value = timedelta(**{suffix: value})
                     else:
                         raise TypeError(
@@ -626,7 +626,7 @@ def _format_value_for_field(config_class: type[Any], field: Field) -> str:
             for name in dir(module):
                 module_locals[name] = getattr(module, name)
         try:
-            evaluated_type = eval(field_type, globals(), module_locals)
+            evaluated_type = eval(field_type, globals(), module_locals)  # noqa: PGH001
         except Exception:
             field_type = None
         else:
@@ -661,7 +661,7 @@ def _format_value_for_type(field_type: type[Any]) -> str:
             return "".join(_format_fields_inline(field_type))
         else:
             # We have handled all the non-generic types supported by _collect_type().
-            assert False
+            raise AssertionError(field_type)
     elif origin in (UnionType, Union):
         return " | ".join(_format_value_for_type(arg) for arg in get_args(field_type))
     elif issubclass(origin, Mapping):
@@ -672,7 +672,7 @@ def _format_value_for_type(field_type: type[Any]) -> str:
         return "'fully.qualified.class.name'"
     else:
         # This is currently unreachable because we reject unsupported generic types in _collect_type().
-        assert False
+        raise AssertionError(origin)
 
 
 def _format_fields_inline(config_class: type[Any]) -> Iterable[str]:

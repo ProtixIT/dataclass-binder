@@ -44,6 +44,17 @@ line_length = 120
 line-length = 120
 target-version = "py310"
 src = ["src"]
+select = [
+    "F", "E", "W", "I", "N", "UP", "ANN0", "ANN2", "FBT", "B", "A", "C4", "FA",
+    "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM",
+    "ARG", "ERA", "PGH", "PLC", "PLE", "PLW", "TRY", "FLY", "RUF",
+]
+ignore = [
+    "PT007",  # not using tuples for single argument helps readability
+    "RET505", "RET506",  # not sure following that style improves readability
+    "PLW2901",  # overwriting the loop variable is sometimes useful
+    "TRY003",  # maybe in the future
+]
 
 [tool.mypy]
 disallow_incomplete_defs = true
