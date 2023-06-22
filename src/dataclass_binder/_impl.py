@@ -40,7 +40,7 @@ def _collect_type(field_type: type, context: str) -> type:
         elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType):
             return field_type
         elif field_type is type:
-            # https://github.com/python/mypy/issues/12392
+            # https://github.com/python/mypy/issues/13026
             return cast(type, type[Any])  # type: ignore[index]
         elif hasattr(field_type, "__class_getitem__"):
             raise TypeError(f"Field '{context}' needs type argument(s)")
