@@ -26,6 +26,7 @@ pre-commit = "^2.20.0"
 mypy = "^1.0"
 pytest = "^7.2.0"
 pytest-cov = "^4.0.0"
+ruff = "0.0.274"
 
 [tool.poetry.group.coverage.dependencies]
 coverage = {version = "^7.0.0", extras = ["toml"]}
@@ -38,6 +39,11 @@ target-version = ["py310"]
 profile = "black"
 multi_line_output = 3
 line_length = 120
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["src"]
 
 [tool.mypy]
 disallow_incomplete_defs = true

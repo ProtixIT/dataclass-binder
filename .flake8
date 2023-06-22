@@ -1,5 +1,0 @@
-[flake8]
-max-line-length: 120
-# E203: whitespace before ':'
-#       Black and flake8 disagree on how slices should be formatted.
-ignore: E203
