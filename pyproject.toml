@@ -26,6 +26,7 @@ pre-commit = "^2.20.0"
 mypy = "^1.0"
 pytest = "^7.2.0"
 pytest-cov = "^4.0.0"
+ruff = "0.0.274"
 
 [tool.poetry.group.coverage.dependencies]
 coverage = {version = "^7.0.0", extras = ["toml"]}
@@ -38,6 +39,22 @@ target-version = ["py310"]
 profile = "black"
 multi_line_output = 3
 line_length = 120
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["src"]
+select = [
+    "F", "E", "W", "I", "N", "UP", "ANN0", "ANN2", "FBT", "B", "A", "C4", "FA",
+    "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SLF", "SIM",
+    "ARG", "ERA", "PGH", "PLC", "PLE", "PLW", "TRY", "FLY", "RUF",
+]
+ignore = [
+    "PT007",  # not using tuples for single argument helps readability
+    "RET505", "RET506",  # not sure following that style improves readability
+    "PLW2901",  # overwriting the loop variable is sometimes useful
+    "TRY003",  # maybe in the future
+]
 
 [tool.mypy]
 disallow_incomplete_defs = true
@@ -65,6 +82,8 @@ exclude_lines = [
     # Intended to be unreachable:
     "raise NotImplementedError$",
     "raise NotImplementedError\\(",
+    "raise AssertionError$",
+    "raise AssertionError\\(",
     "assert False$",
     "assert False,",
     # Debug-only code:

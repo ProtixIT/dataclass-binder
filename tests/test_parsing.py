@@ -10,7 +10,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, BinaryIO, Generic, TypeVar
 
-from pytest import raises
+import pytest
 
 from dataclass_binder import Binder
 from dataclass_binder._impl import _find_object_by_name
@@ -55,13 +55,13 @@ def test_find_object_by_name_nested_class() -> None:
 def test_find_object_by_name_missing() -> None:
     """ValueError is raised if the given name does not exist."""
 
-    with raises(
+    with pytest.raises(
         ValueError,
         match=r"^Python object for 'Config.bad_module' not found: no top-level module named 'no-such-module'$",
     ):
         _find_object_by_name("no-such-module", "Config.bad_module")
 
-    with raises(
+    with pytest.raises(
         ValueError,
         match=r"^Python object for 'Config.bad_class' not found: "
         r"name 'no-such-name' does not exist in 'dataclass_binder'$",
@@ -72,7 +72,7 @@ def test_find_object_by_name_missing() -> None:
 def test_binder_not_specialized() -> None:
     """A clear exception is raised when trying to use a binder without specializing it first."""
 
-    with raises(TypeError, match=r"^Binder must be specialized before use, for example Binder\[MyDataClass\]$"):
+    with pytest.raises(TypeError, match=r"^Binder must be specialized before use, for example Binder\[MyDataClass\]$"):
         Binder.parse_toml(BytesIO())
 
 
@@ -153,10 +153,10 @@ def test_bind_immutable() -> None:
     ) as stream:
         config = Binder[Config].parse_toml(stream)
 
-    with raises(FrozenInstanceError):
+    with pytest.raises(FrozenInstanceError):
         config.rest_api_port = 1234  # type: ignore[misc]
 
-    with raises(FrozenInstanceError):
+    with pytest.raises(FrozenInstanceError):
         config.new_field = True  # type: ignore[attr-defined]
 
     assert isinstance(config.feed_job_prefixes, tuple)
@@ -216,29 +216,37 @@ def test_bind_union() -> None:
     assert config_str.favorite == "fly"
     assert config_int.favorite == 3
 
-    with stream_text("favorite = false") as stream:
-        with raises(TypeError, match=r"^Value for 'UnionConfig.favorite' has type 'bool', expected 'int | str$"):
-            Binder[UnionConfig].parse_toml(stream)
+    with (
+        stream_text("favorite = false") as stream,
+        pytest.raises(TypeError, match=r"^Value for 'UnionConfig.favorite' has type 'bool', expected 'int | str$"),
+    ):
+        Binder[UnionConfig].parse_toml(stream)
 
 
 def test_bind_key_underscore() -> None:
     """ValueError is raised when a TOML key contains an underscore."""
 
-    with stream_text("trend_identifier = 'fly'") as stream:
-        with raises(ValueError, match=r"^Underscore found in TOML key 'trend_identifier'$"):
-            Binder[OptionalConfig].parse_toml(stream)
+    with (
+        stream_text("trend_identifier = 'fly'") as stream,
+        pytest.raises(ValueError, match=r"^Underscore found in TOML key 'trend_identifier'$"),
+    ):
+        Binder[OptionalConfig].parse_toml(stream)
 
 
 def test_bind_key_does_not_exist() -> None:
     """ValueError is raised when a TOML key does not match any dataclass field."""
 
-    with stream_text("nosuchfield = true") as stream:
-        with raises(ValueError, match=r"^Field 'OptionalConfig.nosuchfield' does not exist$"):
-            Binder[OptionalConfig].parse_toml(stream)
+    with (
+        stream_text("nosuchfield = true") as stream,
+        pytest.raises(ValueError, match=r"^Field 'OptionalConfig.nosuchfield' does not exist$"),
+    ):
+        Binder[OptionalConfig].parse_toml(stream)
 
-    with stream_text("no-such-field = true") as stream:
-        with raises(ValueError, match=r"^Field 'OptionalConfig.no_such_field' does not exist$"):
-            Binder[OptionalConfig].parse_toml(stream)
+    with (
+        stream_text("no-such-field = true") as stream,
+        pytest.raises(ValueError, match=r"^Field 'OptionalConfig.no_such_field' does not exist$"),
+    ):
+        Binder[OptionalConfig].parse_toml(stream)
 
 
 def test_specialize_nontype_annotation() -> None:
@@ -248,21 +256,21 @@ def test_specialize_nontype_annotation() -> None:
     class BadConfig1:
         thing: 0  # type: ignore[valid-type]
 
-    with raises(TypeError, match=r"^Annotation for field 'BadConfig1.thing' is not a type$"):
+    with pytest.raises(TypeError, match=r"^Annotation for field 'BadConfig1.thing' is not a type$"):
         Binder[BadConfig1]
 
     @dataclass(frozen=True)
     class BadConfig2:
         thing: T  # type: ignore[valid-type]
 
-    with raises(TypeError, match=r"^Annotation for field 'BadConfig2.thing' is not a type$"):
+    with pytest.raises(TypeError, match=r"^Annotation for field 'BadConfig2.thing' is not a type$"):
         Binder[BadConfig2]
 
     @dataclass(frozen=True)
     class BadConfig3:
         things: Iterable[T]  # type: ignore[valid-type]
 
-    with raises(TypeError, match=r"^Annotation for field 'BadConfig3.things\[\]' is not a type$"):
+    with pytest.raises(TypeError, match=r"^Annotation for field 'BadConfig3.things\[\]' is not a type$"):
         Binder[BadConfig3]
 
 
@@ -273,21 +281,21 @@ def test_specialize_missing_typeargs() -> None:
     class BadConfig1:
         things: tuple
 
-    with raises(TypeError, match=r"^Field 'BadConfig1.things' needs type argument\(s\)$"):
+    with pytest.raises(TypeError, match=r"^Field 'BadConfig1.things' needs type argument\(s\)$"):
         Binder[BadConfig1]
 
     @dataclass(frozen=True)
     class BadConfig2:
         things: Sequence
 
-    with raises(TypeError, match=r"^Field 'BadConfig2.things' needs type argument\(s\)$"):
+    with pytest.raises(TypeError, match=r"^Field 'BadConfig2.things' needs type argument\(s\)$"):
         Binder[BadConfig2]
 
     @dataclass(frozen=True)
     class BadConfig3:
         things: Mapping
 
-    with raises(TypeError, match=r"^Field 'BadConfig3.things' needs type argument\(s\)$"):
+    with pytest.raises(TypeError, match=r"^Field 'BadConfig3.things' needs type argument\(s\)$"):
         Binder[BadConfig3]
 
 
@@ -298,7 +306,7 @@ def test_specialize_mapping_num_type_args() -> None:
     class BadConfig:
         things: Mapping[str]  # type: ignore[type-arg]
 
-    with raises(TypeError, match=r"^Mapping 'BadConfig.things' must have two type arguments$"):
+    with pytest.raises(TypeError, match=r"^Mapping 'BadConfig.things' must have two type arguments$"):
         Binder[BadConfig]
 
 
@@ -309,7 +317,7 @@ def test_specialize_mapping_bad_key_type() -> None:
     class BadConfig:
         magic_numbers: Mapping[int, int]
 
-    with raises(TypeError, match=r"^Mapping 'BadConfig.magic_numbers' has key type 'int', expected 'str'$"):
+    with pytest.raises(TypeError, match=r"^Mapping 'BadConfig.magic_numbers' has key type 'int', expected 'str'$"):
         Binder[BadConfig]
 
 
@@ -320,7 +328,7 @@ def test_specialize_bad_type_args() -> None:
     class BadConfig1:
         things: type[int, str]  # type: ignore[valid-type]
 
-    with raises(
+    with pytest.raises(
         TypeError, match=r"^type\[...\] annotation for 'BadConfig1.things' must have exactly one type argument$"
     ):
         Binder[BadConfig1]
@@ -329,21 +337,25 @@ def test_specialize_bad_type_args() -> None:
     class BadConfig2:
         things: type[0]  # type: ignore[valid-type]
 
-    with raises(TypeError, match=r"^type\[...\] annotation for 'BadConfig2.things' must have a type as its argument$"):
+    with pytest.raises(
+        TypeError, match=r"^type\[...\] annotation for 'BadConfig2.things' must have a type as its argument$"
+    ):
         Binder[BadConfig2]
 
 
 def test_bind_sequence_nonarray() -> None:
     """TypeError is raised when the value for a sequence field is not an array."""
 
-    with stream_text(
-        """
-        rest-api-port = 6000
-        feed-job-prefixes = "MIX"
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'Config.feed_job_prefixes' has type 'str', expected array$"):
-            Binder[Config].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            rest-api-port = 6000
+            feed-job-prefixes = "MIX"
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'Config.feed_job_prefixes' has type 'str', expected array$"),
+    ):
+        Binder[Config].parse_toml(stream)
 
 
 def test_bind_int_nonint() -> None:
@@ -353,30 +365,36 @@ def test_bind_int_nonint() -> None:
     class MiniConfig:
         rest_api_port: int
 
-    with stream_text(
-        """
-        rest-api-port = "6000"
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'MiniConfig.rest_api_port' has type 'str', expected 'int'$"):
-            Binder[MiniConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            rest-api-port = "6000"
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'MiniConfig.rest_api_port' has type 'str', expected 'int'$"),
+    ):
+        Binder[MiniConfig].parse_toml(stream)
 
-    with stream_text(
-        """
-        rest-api-port = [6000]
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'MiniConfig.rest_api_port' has type 'list', expected 'int'$"):
-            Binder[MiniConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            rest-api-port = [6000]
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'MiniConfig.rest_api_port' has type 'list', expected 'int'$"),
+    ):
+        Binder[MiniConfig].parse_toml(stream)
 
     # The 'bool' type is a subtype of 'int', but in configurations we consider them incompatible.
-    with stream_text(
-        """
-        rest-api-port = true
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'MiniConfig.rest_api_port' has type 'bool', expected 'int'$"):
-            Binder[MiniConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            rest-api-port = true
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'MiniConfig.rest_api_port' has type 'bool', expected 'int'$"),
+    ):
+        Binder[MiniConfig].parse_toml(stream)
 
 
 def test_bind_sequence_homogenous_tuple_syntax() -> None:
@@ -395,13 +413,15 @@ def test_bind_sequence_homogenous_tuple_syntax() -> None:
 
     assert config.sounds == ("bah", "moo", "meow")
 
-    with stream_text(
-        """
-        sounds = ["bark", false]
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'AnimalConfig.sounds\[1\]' has type 'bool', expected 'str'$"):
-            Binder[AnimalConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            sounds = ["bark", false]
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'AnimalConfig.sounds\[1\]' has type 'bool', expected 'str'$"),
+    ):
+        Binder[AnimalConfig].parse_toml(stream)
 
 
 def test_bind_sequence_homogenous_badelement() -> None:
@@ -410,14 +430,16 @@ def test_bind_sequence_homogenous_badelement() -> None:
     type annotation in the dataclass.
     """
 
-    with stream_text(
-        """
-        rest-api-port = 6000
-        feed-job-prefixes = ["MIX1:", 2, "MIX3:"]
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'Config.feed_job_prefixes\[1\]' has type 'int', expected 'str'$"):
-            Binder[Config].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            rest-api-port = 6000
+            feed-job-prefixes = ["MIX1:", 2, "MIX3:"]
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'Config.feed_job_prefixes\[1\]' has type 'int', expected 'str'$"),
+    ):
+        Binder[Config].parse_toml(stream)
 
 
 def test_bind_sequence_heterogenous_badelement() -> None:
@@ -430,13 +452,15 @@ def test_bind_sequence_heterogenous_badelement() -> None:
     class MiniConfig:
         params: tuple[str, int, bool, str]
 
-    with stream_text(
-        """
-        params = ["abc", 2, true, false]
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'MiniConfig.params\[3\]' has type 'bool', expected 'str'$"):
-            Binder[MiniConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            params = ["abc", 2, true, false]
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'MiniConfig.params\[3\]' has type 'bool', expected 'str'$"),
+    ):
+        Binder[MiniConfig].parse_toml(stream)
 
 
 def test_bind_sequence_heterogenous_badsize() -> None:
@@ -449,13 +473,15 @@ def test_bind_sequence_heterogenous_badsize() -> None:
     class MiniConfig:
         params: tuple[str, int, bool, str]
 
-    with stream_text(
-        """
-        params = ["abc", 2, true]
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Expected 4 elements for 'MiniConfig.params', got 3$"):
-            Binder[MiniConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            params = ["abc", 2, true]
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Expected 4 elements for 'MiniConfig.params', got 3$"),
+    ):
+        Binder[MiniConfig].parse_toml(stream)
 
 
 def test_bind_nested_tuple() -> None:
@@ -506,35 +532,39 @@ def test_bind_mapping_access() -> None:
     assert config.magic_numbers["the-beast"] == 666
     assert config.magic_numbers.get("missingno") is None
 
-    with raises(TypeError):
+    with pytest.raises(TypeError):
         config.magic_numbers["suitcase"] = 12345  # type: ignore[index]
 
 
 def test_bind_mapping_nontable() -> None:
     """TypeError is raised when the value for a mapping field is not a table."""
 
-    with stream_text(
-        """
-        magic-numbers = 83
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'MappingConfig.magic_numbers' has type 'int', expected table$"):
-            Binder[MappingConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            magic-numbers = 83
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'MappingConfig.magic_numbers' has type 'int', expected table$"),
+    ):
+        Binder[MappingConfig].parse_toml(stream)
 
 
 def test_bind_mapping_badvalue() -> None:
     """TypeError is raised when the value inside a mapping does not match the annotation."""
 
-    with stream_text(
-        """
-        magic-numbers = {the-answer = true}
-        """
-    ) as stream:
-        with raises(
+    with (
+        stream_text(
+            """
+            magic-numbers = {the-answer = true}
+            """
+        ) as stream,
+        pytest.raises(
             TypeError,
             match=r"^Value for 'MappingConfig.magic_numbers\[\"the-answer\"\]' has type 'bool', expected 'int'$",
-        ):
-            Binder[MappingConfig].parse_toml(stream)
+        ),
+    ):
+        Binder[MappingConfig].parse_toml(stream)
 
 
 def test_bind_datetime() -> None:
@@ -580,13 +610,15 @@ def test_bind_timedelta_direct() -> None:
 
     assert config.duration == timedelta(hours=12, minutes=34, seconds=56, milliseconds=789)
 
-    with stream_text(
-        """
-        duration = false
-        """
-    ) as stream:
-        with raises(TypeError, match="^Value for 'TimeDeltaConfig.duration' has type 'bool', expected time$"):
-            Binder[TimeDeltaConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            duration = false
+            """
+        ) as stream,
+        pytest.raises(TypeError, match="^Value for 'TimeDeltaConfig.duration' has type 'bool', expected time$"),
+    ):
+        Binder[TimeDeltaConfig].parse_toml(stream)
 
 
 def test_bind_timedelta_suffix() -> None:
@@ -610,43 +642,49 @@ def test_bind_timedelta_suffix() -> None:
 
     assert config.duration == timedelta(hours=7.5)
 
-    with stream_text(
-        """
-        duration-weeks = false
-        """
-    ) as stream:
-        with raises(
+    with (
+        stream_text(
+            """
+            duration-weeks = false
+            """
+        ) as stream,
+        pytest.raises(
             TypeError,
             match="^Value for 'TimeDeltaConfig.duration' with suffix 'weeks' has type 'bool', expected number$",
-        ):
-            Binder[TimeDeltaConfig].parse_toml(stream)
+        ),
+    ):
+        Binder[TimeDeltaConfig].parse_toml(stream)
 
 
 def test_bind_unknown_suffix() -> None:
     """Non-existing suffixes are rejected."""
 
     # Type 'int' does support any suffixes.
-    with stream_text(
-        """
-        rest-api-port-thingy = true
-        """
-    ) as stream:
-        with raises(
+    with (
+        stream_text(
+            """
+            rest-api-port-thingy = true
+            """
+        ) as stream,
+        pytest.raises(
             ValueError, match=r"^Field 'Config.rest_api_port' has type 'int', which does not support suffix 'thingy'$"
-        ):
-            Binder[Config].parse_toml(stream)
+        ),
+    ):
+        Binder[Config].parse_toml(stream)
 
     # Type 'timedelta' does support suffixes, but not this one.
-    with stream_text(
-        """
-        duration-centuries = true
-        """
-    ) as stream:
-        with raises(
+    with (
+        stream_text(
+            """
+            duration-centuries = true
+            """
+        ) as stream,
+        pytest.raises(
             ValueError,
             match=r"^Field 'TimeDeltaConfig.duration' has type 'timedelta', which does not support suffix 'centuries'$",
-        ):
-            Binder[TimeDeltaConfig].parse_toml(stream)
+        ),
+    ):
+        Binder[TimeDeltaConfig].parse_toml(stream)
 
 
 @dataclass(frozen=True)
@@ -673,29 +711,33 @@ def test_bind_classref_ok() -> None:
 def test_bind_classref_nonstring() -> None:
     """TypeError is raised when a reference to a Python class is not a TOML string."""
 
-    with stream_text(
-        """
-        first-class = 'logging.FileHandler'
-        second-class = 123
-        """
-    ) as stream:
-        with raises(
+    with (
+        stream_text(
+            """
+            first-class = 'logging.FileHandler'
+            second-class = 123
+            """
+        ) as stream,
+        pytest.raises(
             TypeError, match=r"^Expected TOML string for Python reference 'ClassRefConfig.second_class', got 'int'$"
-        ):
-            Binder[ClassRefConfig].parse_toml(stream)
+        ),
+    ):
+        Binder[ClassRefConfig].parse_toml(stream)
 
 
 def test_bind_classref_nonclass() -> None:
     """TypeError is raised if a class reference doesn't resolve to a class."""
 
-    with stream_text(
-        """
-        first-class = 'logging.FileHandler'
-        second-class = 'tests.example.Config.port'
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'ClassRefConfig.second_class' has type 'int', expected class$"):
-            Binder[ClassRefConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            first-class = 'logging.FileHandler'
+            second-class = 'tests.example.Config.port'
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'ClassRefConfig.second_class' has type 'int', expected class$"),
+    ):
+        Binder[ClassRefConfig].parse_toml(stream)
 
 
 class DummyBase:
@@ -714,16 +756,18 @@ def test_bind_classref_notsubclass() -> None:
         base: type[DummyBase]
         sub: type[DummySub]
 
-    with stream_text(
-        """
-        base = 'tests.test_parsing.DummySub'
-        sub = 'tests.test_parsing.DummyBase'
-        """
-    ) as stream:
-        with raises(
+    with (
+        stream_text(
+            """
+            base = 'tests.test_parsing.DummySub'
+            sub = 'tests.test_parsing.DummyBase'
+            """
+        ) as stream,
+        pytest.raises(
             TypeError, match=r"^Resolved 'SubclassConfig.sub' to class 'DummyBase', expected subclass of 'DummySub'$"
-        ):
-            Binder[SubclassConfig].parse_toml(stream)
+        ),
+    ):
+        Binder[SubclassConfig].parse_toml(stream)
 
 
 def test_bind_classref_union_in_sequence() -> None:
@@ -742,17 +786,19 @@ def test_bind_classref_union_in_sequence() -> None:
 
     assert config.models == (logging.FileHandler, logging.Formatter)
 
-    with stream_text(
-        """
-        models = ['logging.FileHandler', 'logging.Formatter', 12:34:56]
-        """
-    ) as stream:
-        with raises(
+    with (
+        stream_text(
+            """
+            models = ['logging.FileHandler', 'logging.Formatter', 12:34:56]
+            """
+        ) as stream,
+        pytest.raises(
             TypeError,
             match=r"Value for 'MultiClassConfig.models\[2\]' has type 'time', "
             r"expected 'type\[logging.Handler\] | type\[logging\.Formatter\]'$",
-        ):
-            Binder[MultiClassConfig].parse_toml(stream)
+        ),
+    ):
+        Binder[MultiClassConfig].parse_toml(stream)
 
 
 @dataclass(frozen=True)
@@ -772,19 +818,23 @@ def test_bind_module_ok() -> None:
 def test_bind_module_nonstring() -> None:
     """TypeError is raised when a reference to a Python class is not a TOML string."""
 
-    with stream_text("plugin-module = 123") as stream:
-        with raises(
+    with (
+        stream_text("plugin-module = 123") as stream,
+        pytest.raises(
             TypeError, match=r"^Expected TOML string for Python reference 'ModuleConfig.plugin_module', got 'int'$"
-        ):
-            Binder[ModuleConfig].parse_toml(stream)
+        ),
+    ):
+        Binder[ModuleConfig].parse_toml(stream)
 
 
 def test_bind_module_nonmodule() -> None:
     """TypeError is raised if a module reference doesn't resolve to a module."""
 
-    with stream_text("plugin-module = 'tests.example.TEMPLATE'") as stream:
-        with raises(TypeError, match=r"^Value for 'ModuleConfig.plugin_module' has type 'Config', expected module$"):
-            Binder[ModuleConfig].parse_toml(stream)
+    with (
+        stream_text("plugin-module = 'tests.example.TEMPLATE'") as stream,
+        pytest.raises(TypeError, match=r"^Value for 'ModuleConfig.plugin_module' has type 'Config', expected module$"),
+    ):
+        Binder[ModuleConfig].parse_toml(stream)
 
 
 def test_bind_dataclass_as_field() -> None:
@@ -803,23 +853,27 @@ def test_bind_dataclass_as_field() -> None:
 
     assert config.trend.trend_identifier == "uprising risk"
 
-    with stream_text(
-        """
-        trend = {trend-identifier = 1}
-        """
-    ) as stream:
-        with raises(
+    with (
+        stream_text(
+            """
+            trend = {trend-identifier = 1}
+            """
+        ) as stream,
+        pytest.raises(
             TypeError, match=r"^Value for 'OuterConfig.trend.trend_identifier' has type 'int', expected 'str'$"
-        ):
-            Binder[OuterConfig].parse_toml(stream)
+        ),
+    ):
+        Binder[OuterConfig].parse_toml(stream)
 
-    with stream_text(
-        """
-        trend = false
-        """
-    ) as stream:
-        with raises(TypeError, match=r"^Value for 'OuterConfig.trend' has type 'bool', expected table$"):
-            Binder[OuterConfig].parse_toml(stream)
+    with (
+        stream_text(
+            """
+            trend = false
+            """
+        ) as stream,
+        pytest.raises(TypeError, match=r"^Value for 'OuterConfig.trend' has type 'bool', expected table$"),
+    ):
+        Binder[OuterConfig].parse_toml(stream)
 
 
 @dataclass(frozen=True)
@@ -834,7 +888,7 @@ def test_bind_dataclass_specialization() -> None:
     class BadConfig:
         thing: GenericConfig
 
-    with raises(TypeError, match=r"^Field 'BadConfig.thing' needs type argument\(s\)$"):
+    with pytest.raises(TypeError, match=r"^Field 'BadConfig.thing' needs type argument\(s\)$"):
         Binder[BadConfig]
 
     @dataclass(frozen=True)
@@ -842,7 +896,7 @@ def test_bind_dataclass_specialization() -> None:
         thing: GenericConfig[str]
 
     # TODO: It would be nice to support this in the future.
-    with raises(TypeError, match=r"^Field 'OuterConfig.thing' has unsupported generic type 'GenericConfig'$"):
+    with pytest.raises(TypeError, match=r"^Field 'OuterConfig.thing' has unsupported generic type 'GenericConfig'$"):
         Binder[OuterConfig]
 
 
@@ -886,7 +940,7 @@ def test_specialize_annotation_nested_scope() -> None:
     class Config:
         hidden: Hidden
 
-    with raises(TypeError, match=r"^Failed to parse annotation of field 'Config\.hidden': "):
+    with pytest.raises(TypeError, match=r"^Failed to parse annotation of field 'Config\.hidden': "):
         Binder[Config]
 
 
@@ -919,7 +973,9 @@ def test_bind_excluded_from_init() -> None:
 
     assert config.total == 10
 
-    with stream_text("total = 9001") as stream:
+    with (
+        stream_text("total = 9001") as stream,
         # TODO: Refine error message: the field does exist, but it's excluded.
-        with raises(ValueError, match=r"^Field 'SumConfig\.total' does not exist$"):
-            Binder[SumConfig].parse_toml(stream)
+        pytest.raises(ValueError, match=r"^Field 'SumConfig\.total' does not exist$"),
+    ):
+        Binder[SumConfig].parse_toml(stream)

@@ -6,7 +6,7 @@ from io import BytesIO
 from types import ModuleType
 from typing import Any
 
-from pytest import fixture, mark, raises
+import pytest
 
 from dataclass_binder import Binder, format_template
 from dataclass_binder._impl import _iter_format_value, format_toml_pair, get_field_docstrings
@@ -29,7 +29,7 @@ def parse_toml(dc: type[Any], toml: str) -> Any:
     with BytesIO(toml.encode()) as stream:
         obj = binder.parse_toml(stream)
 
-    return getattr(obj, "value")
+    return obj.value  # type: ignore[attr-defined]
 
 
 def round_trip(value: object, dc: type[Any]) -> Any:
@@ -40,11 +40,11 @@ def round_trip(value: object, dc: type[Any]) -> Any:
     """
 
     toml = format_toml_pair("value", value)
-    print(repr(value), "->", toml)
+    print(repr(value), "->", toml)  # noqa: T201
     return parse_toml(dc, toml)
 
 
-@mark.parametrize(
+@pytest.mark.parametrize(
     "value",
     (
         -1,
@@ -107,7 +107,7 @@ def test_format_value_list_suffix() -> None:
     dc = single_value_dataclass(list[timedelta])
     assert round_trip([], dc) == []
     assert round_trip([timedelta(hours=2)], dc) == [timedelta(hours=2)]
-    with raises(
+    with pytest.raises(
         ValueError, match=r"^Value datetime\.timedelta\(days=2\) in array cannot be expressed without key suffix$"
     ):
         round_trip([timedelta(days=2)], dc)
@@ -141,25 +141,25 @@ def test_format_value_dict_suffix() -> None:
     dc = single_value_dataclass(dict[str, timedelta])
     assert round_trip({}, dc) == {}
     assert round_trip({"delay": timedelta(hours=2)}, dc) == {"delay": timedelta(hours=2)}
-    # assert round_trip({"delay": timedelta(days=2)}, dc) == {"delay": timedelta(days=2)}
+    # assert round_trip({"delay": timedelta(days=2)}, dc) == {"delay": timedelta(days=2)}  # noqa: ERA001
     assert format_toml_pair("value", {"delay": timedelta(days=2)}) == "value = {delay-days = 2}"
 
 
 def test_format_value_nested_dataclass() -> None:
-    @dataclass
+    @dataclass(kw_only=True)
     class Inner:
         key_containing_underscores: bool
         maybesuffix: timedelta
 
     dc = single_value_dataclass(Inner)
-    value = Inner(True, timedelta(days=2))
+    value = Inner(key_containing_underscores=True, maybesuffix=timedelta(days=2))
     assert round_trip(value, dc) == value
 
 
 def test_format_value_unsupported_type() -> None:
-    with raises(TypeError, match="^NoneType$"):
+    with pytest.raises(TypeError, match="^NoneType$"):
         format_toml_pair("unsupported", None)
-    with raises(TypeError, match="^NoneType$"):
+    with pytest.raises(TypeError, match="^NoneType$"):
         list(_iter_format_value(None))
 
 
@@ -208,7 +208,7 @@ class TemplateConfig:
     derived: int = field(init=False)
     """Excluded field."""
 
-    bad_annotation: NoSuchType  # type: ignore[name-defined]  # noqa
+    bad_annotation: NoSuchType  # type: ignore[name-defined]  # noqa: F821
 
 
 def test_format_template_full() -> None:
@@ -259,7 +259,7 @@ class NestedConfig:
     with_default: str = "n/a"
 
 
-@mark.parametrize(
+@pytest.mark.parametrize(
     "field_type", (str, int, float, datetime, date, time, timedelta, list[str], dict[str, int], NestedConfig)
 )
 def test_format_template_valid_value(field_type: type[Any]) -> None:
@@ -270,7 +270,7 @@ def test_format_template_valid_value(field_type: type[Any]) -> None:
     """
     dc = single_value_dataclass(field_type)
     toml = "\n".join(format_template(dc))
-    print(field_type, "->", toml)
+    print(field_type, "->", toml)  # noqa: T201
     parse_toml(dc, toml)
 
 
@@ -308,7 +308,7 @@ webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
     )
 
 
-@fixture
+@pytest.fixture()
 def sourceless_class() -> type[Any]:
     """A class for which no source code is available."""
 
@@ -323,7 +323,7 @@ class C:
         {"dataclass": dataclass},
         defs,
     )
-    C: type[Any] = defs["C"]
+    C: type[Any] = defs["C"]  # noqa: N806
     return C
 
 
