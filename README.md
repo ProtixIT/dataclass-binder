@@ -130,11 +130,9 @@ if __name__ == "__main__":
 If you don't want to bind the contents of a full file, there is also the option to bind a pre-parsed dictionary instead.
 For this, you can use the `bind()` method on the `Binder` object.
 
-For example, the following service uses a hybrid configuration format where a single file configures both the service itself and logging system:
+For example, the following service is configured by one table within a larger TOML configuration file:
 
 ```py
-import logging.config
-
 import tomllib  # or 'tomli' on Python <3.11
 from dataclass_binder import Binder
 
@@ -142,7 +140,6 @@ from dataclass_binder import Binder
 with open("config.toml", "rb") as f:
     config = tomllib.load(f)
 service_config = Binder(ServiceConfig).bind(config["service"])
-logging.config.dictConfig(config["logging"])
 ```
 
 To keep these examples short, from now on `import` statements will only be included the first time a particular imported name is used.
