@@ -15,7 +15,7 @@ from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
 from pathlib import Path
 from textwrap import dedent
 from types import MappingProxyType, ModuleType, NoneType, UnionType
-from typing import Any, BinaryIO, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Any, BinaryIO, Generic, TypeVar, Union, cast, get_args, get_origin
 from weakref import WeakKeyDictionary
 
 if sys.version_info < (3, 11):
@@ -24,7 +24,7 @@ else:
     import tomllib  # pragma: no cover
 
 
-def _collect_type(field_type: type, context: str) -> type:
+def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
     """
     Verify and streamline a type annotation.
 
@@ -46,7 +46,7 @@ def _collect_type(field_type: type, context: str) -> type:
             raise TypeError(f"Field '{context}' needs type argument(s)")
         else:
             # Any type that we don't explicitly support is treated as a nested data class.
-            return Binder.__class_getitem__(field_type)
+            return Binder(field_type)
     elif origin in (UnionType, Union):
         collected_types = [
             # Note that 'arg' cannot be a union itself, as Python automatically flattens nested union types.
@@ -183,50 +183,55 @@ _TIMEDELTA_SUFFIXES = {"days", "seconds", "microseconds", "milliseconds", "minut
 
 T = TypeVar("T")
 
-_binder_cache: MutableMapping[type, type] = WeakKeyDictionary()
+
+class _BinderCache(type, Generic[T]):
+    """
+    Cache that returns a dedicated `Binder` instance for each dataclass.
+    """
+
+    _cache: MutableMapping[T, Binder[T]] = WeakKeyDictionary()
+
+    def __call__(cls, dataclass: T) -> Binder[T]:
+        try:
+            return cls._cache[dataclass]
+        except KeyError:
+            pass
+
+        instance: Binder[T] = super().__call__(dataclass)
+        cls._cache[dataclass] = instance
+        return instance
 
 
-class Binder(Generic[T]):
+class Binder(Generic[T], metaclass=_BinderCache):
     """
     Binds TOML data to a specific dataclass.
     """
 
-    __slots__ = ()
-    _field_types: ClassVar[Mapping[str, type]]
+    __slots__ = ("_config_class", "_field_types")
+    _config_class: type[T]
+    _field_types: Mapping[str, type | Binder[Any]]
 
-    @classmethod
-    def _get_config_class(cls) -> type[T]:
-        config_class: type[T]
-        (config_class,) = cls.__orig_bases__[0].__args__  # type: ignore[attr-defined]
-        if isinstance(config_class, TypeVar):
-            raise TypeError("Binder must be specialized before use, for example Binder[MyDataClass]")
-        return config_class
+    def __class_getitem__(cls: type[Binder[T]], config_class: type[T]) -> Binder[T]:
+        """Deprecated: use `Binder(MyDataClass)` instead."""
+        return cls(config_class)
 
-    def __class_getitem__(cls, config_class: type[T]) -> type[Binder[T]]:
-        try:
-            return _binder_cache[config_class]
-        except KeyError:
-            pass
-
-        field_types = {
-            field_name: _collect_type(field_type, f"{config_class.__name__}.{field_name}")
-            for field_name, field_type in _get_fields(config_class)
+    def __init__(self, dataclass: type[T]) -> None:
+        self._config_class = dataclass
+        self._field_types = {
+            field_name: _collect_type(field_type, f"{dataclass.__name__}.{field_name}")
+            for field_name, field_type in _get_fields(dataclass)
         }
 
-        class SpecializedBinder(super().__class_getitem__(config_class)):  # type: ignore[misc]
-            _config_class = config_class
-            _field_types = field_types
-
-        _binder_cache[config_class] = SpecializedBinder
-        return SpecializedBinder
-
-    @classmethod
-    def _bind_to_single_type(cls, value: object, field_type: type, context: str) -> object:
+    def _bind_to_single_type(self, value: object, field_type: type | Binder[Any], context: str) -> object:
         """
         Convert a TOML value to a singular (non-union) field type.
 
         Raises TypeError if the TOML value's type doesn't match the field type.
         """
+        if isinstance(field_type, Binder):
+            if not isinstance(value, dict):
+                raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
+            return field_type._bind_to_class(value, context)  # noqa: SLF001
         origin = get_origin(field_type)
         if origin is None:
             if field_type is ModuleType:
@@ -247,17 +252,13 @@ class Binder(Generic[T]):
                     )
                 else:
                     raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected time")
-            elif issubclass(field_type, Binder):
-                if not isinstance(value, dict):
-                    raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
-                return field_type._bind_to_class(value, context)  # noqa: SLF001
             elif isinstance(value, field_type) and (type(value) is not bool or field_type is bool):
                 return value
         elif issubclass(origin, Mapping):
             if not isinstance(value, dict):
                 raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
             key_type, elem_type = get_args(field_type)
-            mapping = {key: cls._bind_to_field(elem, elem_type, f'{context}["{key}"]') for key, elem in value.items()}
+            mapping = {key: self._bind_to_field(elem, elem_type, f'{context}["{key}"]') for key, elem in value.items()}
             return (
                 (mapping if isinstance(origin, MutableMapping) else MappingProxyType(mapping))
                 if isabstract(origin)
@@ -270,7 +271,7 @@ class Binder(Generic[T]):
             if issubclass(origin, tuple):
                 if len(type_args) == len(value):
                     return tuple(
-                        cls._bind_to_field(elem, elem_type, f"{context}[{index}]")
+                        self._bind_to_field(elem, elem_type, f"{context}[{index}]")
                         for index, (elem, elem_type) in enumerate(zip(value, type_args, strict=True))
                     )
                 else:
@@ -280,7 +281,7 @@ class Binder(Generic[T]):
                 (list if isinstance(origin, MutableSequence) else tuple) if isabstract(origin) else field_type
             )
             return container_class(
-                cls._bind_to_field(elem, elem_type, f"{context}[{index}]") for index, elem in enumerate(value)
+                self._bind_to_field(elem, elem_type, f"{context}[{index}]") for index, elem in enumerate(value)
             )
         elif origin is type:
             if not isinstance(value, str):
@@ -302,8 +303,7 @@ class Binder(Generic[T]):
 
         raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected '{field_type.__name__}'")
 
-    @classmethod
-    def _bind_to_field(cls, value: object, field_type: type, context: str) -> object:
+    def _bind_to_field(self, value: object, field_type: type | Binder[Any], context: str) -> object:
         """
         Convert a TOML value to a field type which is possibly a union type.
 
@@ -312,7 +312,7 @@ class Binder(Generic[T]):
         if get_origin(field_type) is UnionType:
             for arg in get_args(field_type):
                 try:
-                    return cls._bind_to_single_type(value, arg, context)
+                    return self._bind_to_single_type(value, arg, context)
                 except TypeError:
                     # TODO: This is inefficient: we format and then discard the error string.
                     #       Union types are not used a lot though, so it's fine for now.
@@ -321,11 +321,10 @@ class Binder(Generic[T]):
                     pass
             raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected '{field_type}'")
         else:
-            return cls._bind_to_single_type(value, field_type, context)
+            return self._bind_to_single_type(value, field_type, context)
 
-    @classmethod
-    def _bind_to_class(cls: type[Binder[T]], toml_dict: Mapping[str, Any], context: str) -> T:
-        field_types = cls._field_types
+    def _bind_to_class(self, toml_dict: Mapping[str, Any], context: str) -> T:
+        field_types = self._field_types
         parsed = {}
         for key, value in toml_dict.items():
             if "_" in key:
@@ -347,28 +346,42 @@ class Binder(Generic[T]):
                             f"has type '{type(value).__name__}', expected number"
                         )
                 else:
+                    type_name = (
+                        field_type._config_class if isinstance(field_type, Binder) else field_type  # noqa: SLF001
+                    ).__name__
                     raise ValueError(
-                        f"Field '{context}.{field_name}' has type '{field_type.__name__}', "
+                        f"Field '{context}.{field_name}' has type '{type_name}', "
                         f"which does not support suffix '{suffix}'"
                     )
 
-            parsed[field_name] = cls._bind_to_field(value, field_type, f"{context}.{field_name}")
+            parsed[field_name] = self._bind_to_field(value, field_type, f"{context}.{field_name}")
 
-        return cls._get_config_class()(**parsed)
+        return self._config_class(**parsed)
 
-    @classmethod
-    def bind(cls, data: Mapping[str, Any]) -> T:
-        return cls._bind_to_class(data, cls._get_config_class().__name__)
+    if TYPE_CHECKING:
+        # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
 
-    @classmethod
-    def parse_toml(cls, file: BinaryIO | str | Path) -> T:
-        match file:
-            case Path() | str():
-                with open(file, "rb") as stream:
-                    data = tomllib.load(stream)
-            case _:
-                data = tomllib.load(file)
-        return cls.bind(data)
+        @classmethod
+        def bind(cls, data: Mapping[str, Any]) -> T:
+            ...
+
+        @classmethod
+        def parse_toml(cls, file: BinaryIO | str | Path) -> T:
+            ...
+
+    else:
+
+        def bind(self, data: Mapping[str, Any]) -> T:
+            return self._bind_to_class(data, self._config_class.__name__)
+
+        def parse_toml(self, file: BinaryIO | str | Path) -> T:
+            match file:
+                case Path() | str():
+                    with open(file, "rb") as stream:
+                        data = tomllib.load(stream)
+                case _:
+                    data = tomllib.load(file)
+            return self.bind(data)
 
 
 def format_toml_pair(key: str, value: object) -> str:
@@ -636,7 +649,7 @@ def _format_value_for_field(config_class: type[Any], field: Field) -> str:
     return _format_value_for_type(field_type)
 
 
-def _format_value_for_type(field_type: type[Any]) -> str:
+def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
     origin = get_origin(field_type)
     if origin is None:
         if field_type is str:
@@ -655,8 +668,8 @@ def _format_value_for_type(field_type: type[Any]) -> str:
             return "2020-01-01"
         elif field_type is time or field_type is timedelta:
             return "00:00:00"
-        elif issubclass(field_type, Binder):
-            return "".join(_format_fields_inline(field_type._get_config_class()))  # noqa: SLF001
+        elif isinstance(field_type, Binder):
+            return "".join(_format_fields_inline(field_type._config_class))  # noqa: SLF001
         else:
             # We have handled all the non-generic types supported by _collect_type().
             raise AssertionError(field_type)

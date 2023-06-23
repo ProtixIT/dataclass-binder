@@ -50,7 +50,7 @@ def single_value_dataclass(value_type: type[Any], *, optional: bool = False, str
 
 
 def parse_toml(dc: type[T], toml: str) -> T:
-    binder = Binder[dc]  # type: ignore[valid-type]
+    binder = Binder(dc)
 
     with BytesIO(toml.encode()) as stream:
         return binder.parse_toml(stream)

@@ -69,11 +69,15 @@ def test_find_object_by_name_missing() -> None:
         _find_object_by_name("dataclass_binder.no-such-name", "Config.bad_class")
 
 
-def test_binder_not_specialized() -> None:
-    """A clear exception is raised when trying to use a binder without specializing it first."""
+def test_binder_specialization() -> None:
+    """The deprecated `Binder[DT]` syntax is still supported."""
 
-    with pytest.raises(TypeError, match=r"^Binder must be specialized before use, for example Binder\[MyDataClass\]$"):
-        Binder.parse_toml(BytesIO())
+    @dataclass
+    class Dummy:
+        pass
+
+    # By using `is` we test the caching as well.
+    assert Binder[Dummy] is Binder(Dummy)  # type: ignore[comparison-overlap]
 
 
 @dataclass(frozen=True)
@@ -96,7 +100,7 @@ def test_bind_simple() -> None:
         feed-job-prefixes = ["MIX1:", "MIX2:", "MIX3:"]
         """
     ) as stream:
-        config = Binder[Config].parse_toml(stream)
+        config = Binder(Config).parse_toml(stream)
 
     assert config.rest_api_port == 6000
     assert config.feed_job_prefixes == ("MIX1:", "MIX2:", "MIX3:")
