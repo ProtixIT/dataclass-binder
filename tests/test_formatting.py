@@ -16,11 +16,15 @@ from . import example
 T = TypeVar("T")
 
 
-def single_value_dataclass(annotation: type[Any]) -> type[Any]:
+def single_value_dataclass(annotation: type[Any], *, optional: bool = False) -> type[Any]:
     @dataclass
     class DC:
-        value: object
-        __annotations__["value"] = annotation
+        if optional:
+            value: object = None
+            __annotations__["value"] = annotation | None
+        else:
+            value: object  # type: ignore[no-redef]
+            __annotations__["value"] = annotation
 
     return DC
 
@@ -91,30 +95,34 @@ def round_trip_value(value: T, dc: type[Any]) -> T:
         example,
     ),
 )
-def test_format_value_round_trip(value: object) -> None:
-    dc = single_value_dataclass(type(value))
+@pytest.mark.parametrize("optional", (True, False))
+def test_format_value_round_trip(*, value: object, optional: bool) -> None:
+    dc = single_value_dataclass(type(value), optional=optional)
     assert round_trip_value(value, dc) == value
 
 
-def test_format_value_class() -> None:
-    dc = single_value_dataclass(type)
+@pytest.mark.parametrize("optional", (True, False))
+def test_format_value_class(*, optional: bool) -> None:
+    dc = single_value_dataclass(type, optional=optional)
     assert round_trip_value(example.Config, dc) is example.Config
 
 
-def test_format_value_list_simple() -> None:
+@pytest.mark.parametrize("optional", (True, False))
+def test_format_value_list_simple(*, optional: bool) -> None:
     """A sequence is formatted as a TOML array."""
     value = [1, 2, 3]
-    dc = single_value_dataclass(list[int])
+    dc = single_value_dataclass(list[int], optional=optional)
     assert round_trip_value(value, dc) == value
 
 
-def test_format_value_list_suffix() -> None:
+@pytest.mark.parametrize("optional", (True, False))
+def test_format_value_list_suffix(*, optional: bool) -> None:
     """
     It is an error to use a value that requires a suffix in a sequence.
 
     TODO: Reconsider the design decision to use key suffixes, as it leads to this gap in expressiveness.
     """
-    dc = single_value_dataclass(list[timedelta])
+    dc = single_value_dataclass(list[timedelta], optional=optional)
     assert round_trip_value([], dc) == []
     assert round_trip_value([timedelta(hours=2)], dc) == [timedelta(hours=2)]
     with pytest.raises(
@@ -123,13 +131,14 @@ def test_format_value_list_suffix() -> None:
         round_trip_value([timedelta(days=2)], dc)
 
 
-def test_format_value_dict() -> None:
+@pytest.mark.parametrize("optional", (True, False))
+def test_format_value_dict(*, optional: bool) -> None:
     """
     A mapping is formatted as a TOML inline table.
 
     Bare keys are used where possible, otherwise quoted keys.
     """
-    dc = single_value_dataclass(dict[str, int])
+    dc = single_value_dataclass(dict[str, int], optional=optional)
     value = {"a": 1, "b": 2, "c": 3}
     assert format_toml_pair("value", value) == "value = {a = 1, b = 2, c = 3}"
     assert round_trip_value(value, dc) == value
@@ -140,7 +149,8 @@ def test_format_value_dict() -> None:
     assert round_trip_value(value, dc) == value
 
 
-def test_format_value_dict_suffix() -> None:
+@pytest.mark.parametrize("optional", (True, False))
+def test_format_value_dict_suffix(*, optional: bool) -> None:
     """
     Values that require a suffix can be used in a mapping.
 
@@ -148,20 +158,21 @@ def test_format_value_dict_suffix() -> None:
           I don't want to spend time fixing this though if we might throw out the entire suffix mechanism;
           see test_format_value_list_suffix() for details.
     """
-    dc = single_value_dataclass(dict[str, timedelta])
+    dc = single_value_dataclass(dict[str, timedelta], optional=optional)
     assert round_trip_value({}, dc) == {}
     assert round_trip_value({"delay": timedelta(hours=2)}, dc) == {"delay": timedelta(hours=2)}
     # assert round_trip({"delay": timedelta(days=2)}, dc) == {"delay": timedelta(days=2)}  # noqa: ERA001
     assert format_toml_pair("value", {"delay": timedelta(days=2)}) == "value = {delay-days = 2}"
 
 
-def test_format_value_nested_dataclass() -> None:
+@pytest.mark.parametrize("optional", (True, False))
+def test_format_value_nested_dataclass(*, optional: bool) -> None:
     @dataclass(kw_only=True)
     class Inner:
         key_containing_underscores: bool
         maybesuffix: timedelta
 
-    dc = single_value_dataclass(Inner)
+    dc = single_value_dataclass(Inner, optional=optional)
     value = Inner(key_containing_underscores=True, maybesuffix=timedelta(days=2))
     assert round_trip_value(value, dc) == value
 
@@ -181,8 +192,9 @@ def test_docstring_extraction_example() -> None:
     }
 
 
-def test_docstring_extraction_indented() -> None:
-    dc = single_value_dataclass(int)
+@pytest.mark.parametrize("optional", (True, False))
+def test_docstring_extraction_indented(*, optional: bool) -> None:
+    dc = single_value_dataclass(int, optional=optional)
     docstrings = get_field_docstrings(dc)
     assert docstrings == {}
 
@@ -272,13 +284,14 @@ class NestedConfig:
 @pytest.mark.parametrize(
     "field_type", (str, int, float, datetime, date, time, timedelta, list[str], dict[str, int], NestedConfig)
 )
-def test_format_template_valid_value(field_type: type[Any]) -> None:
+@pytest.mark.parametrize("optional", (True, False))
+def test_format_template_valid_value(*, field_type: type[Any], optional: bool) -> None:
     """
     The template generated for the given field type is valid TOML and the value has the right type.
 
     Not all templates values are valid TOML, but the selected parameters are.
     """
-    dc = single_value_dataclass(field_type)
+    dc = single_value_dataclass(field_type, optional=optional)
     toml = "\n".join(format_template(dc))
     print(field_type, "->", toml)  # noqa: T201
     parse_toml(dc, toml)

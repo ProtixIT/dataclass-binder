@@ -618,24 +618,22 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
 def _format_value_for_field(config_class: type[Any], field: Field) -> str:
     """Format an example value or placeholder for a value depending on the given field's type."""
 
-    field_type: type[Any] | str | None = field.type
-    if isinstance(field_type, str):
+    annotated_type: type[Any] | str | None = field.type
+    if isinstance(annotated_type, str):
         module_locals = {}
         module = getmodule(config_class)
         if module is not None:
             for name in dir(module):
                 module_locals[name] = getattr(module, name)
         try:
-            evaluated_type = eval(field_type, globals(), module_locals)  # noqa: PGH001
+            evaluated_type = eval(annotated_type, globals(), module_locals)  # noqa: PGH001
         except Exception:
-            field_type = None
-        else:
-            field_type = _collect_type(evaluated_type, f"{config_class.__name__}.{field.name}")
-
-    if field_type is None:
-        return "???"
+            return "???"
     else:
-        return _format_value_for_type(field_type)
+        evaluated_type = annotated_type
+
+    field_type = _collect_type(evaluated_type, f"{config_class.__name__}.{field.name}")
+    return _format_value_for_type(field_type)
 
 
 def _format_value_for_type(field_type: type[Any]) -> str:
@@ -657,8 +655,8 @@ def _format_value_for_type(field_type: type[Any]) -> str:
             return "2020-01-01"
         elif field_type is time or field_type is timedelta:
             return "00:00:00"
-        elif is_dataclass(field_type):
-            return "".join(_format_fields_inline(field_type))
+        elif issubclass(field_type, Binder):
+            return "".join(_format_fields_inline(field_type._get_config_class()))  # noqa: SLF001
         else:
             # We have handled all the non-generic types supported by _collect_type().
             raise AssertionError(field_type)
