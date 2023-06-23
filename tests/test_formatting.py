@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
 from types import ModuleType
-from typing import Any
+from typing import Any, TypeVar, cast
 
 import pytest
 
@@ -12,6 +12,8 @@ from dataclass_binder import Binder, format_template
 from dataclass_binder._impl import _iter_format_value, format_toml_pair, get_field_docstrings
 
 from . import example
+
+T = TypeVar("T")
 
 
 def single_value_dataclass(annotation: type[Any]) -> type[Any]:
@@ -23,16 +25,14 @@ def single_value_dataclass(annotation: type[Any]) -> type[Any]:
     return DC
 
 
-def parse_toml(dc: type[Any], toml: str) -> Any:
+def parse_toml(dc: type[T], toml: str) -> T:
     binder = Binder[dc]  # type: ignore[valid-type]
 
     with BytesIO(toml.encode()) as stream:
-        obj = binder.parse_toml(stream)
-
-    return obj.value  # type: ignore[attr-defined]
+        return binder.parse_toml(stream)
 
 
-def round_trip(value: object, dc: type[Any]) -> Any:
+def round_trip(value: T, dc: type[Any]) -> T:
     """
     Convert data in a dataclass to TOML and back.
 
@@ -41,7 +41,8 @@ def round_trip(value: object, dc: type[Any]) -> Any:
 
     toml = format_toml_pair("value", value)
     print(repr(value), "->", toml)  # noqa: T201
-    return parse_toml(dc, toml)
+    obj = parse_toml(dc, toml)
+    return cast(T, obj.value)
 
 
 @pytest.mark.parametrize(
