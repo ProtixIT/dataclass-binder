@@ -44,6 +44,9 @@ def _collect_type(field_type: type, context: str) -> type:
             return cast(type, type[Any])  # type: ignore[index]
         elif hasattr(field_type, "__class_getitem__"):
             raise TypeError(f"Field '{context}' needs type argument(s)")
+        else:
+            # Any type that we don't explicitly support is treated as a nested data class.
+            return Binder.__class_getitem__(field_type)
     elif origin in (UnionType, Union):
         collected_types = [
             # Note that 'arg' cannot be a union itself, as Python automatically flattens nested union types.
@@ -95,9 +98,6 @@ def _collect_type(field_type: type, context: str) -> type:
         return reduce(operator.__or__, collected_types)
     else:
         raise TypeError(f"Field '{context}' has unsupported generic type '{origin.__name__}'")
-
-    # Any type that we don't explicitly support is treated as a nested data class.
-    return Binder.__class_getitem__(field_type)
 
 
 def _find_object_by_name(name: str, context: str) -> object:
