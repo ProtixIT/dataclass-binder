@@ -130,11 +130,9 @@ if __name__ == "__main__":
 If you don't want to bind the contents of a full file, there is also the option to bind a pre-parsed dictionary instead.
 For this, you can use the `bind()` method on the `Binder` object.
 
-For example, the following service uses a hybrid configuration format where a single file configures both the service itself and logging system:
+For example, the following service is configured by one table within a larger TOML configuration file:
 
 ```py
-import logging.config
-
 import tomllib  # or 'tomli' on Python <3.11
 from dataclass_binder import Binder
 
@@ -142,7 +140,6 @@ from dataclass_binder import Binder
 with open("config.toml", "rb") as f:
     config = tomllib.load(f)
 service_config = Binder(ServiceConfig).bind(config["service"])
-logging.config.dictConfig(config["logging"])
 ```
 
 To keep these examples short, from now on `import` statements will only be included the first time a particular imported name is used.
@@ -284,6 +281,58 @@ token = "frperg"
 ```
 
 Always define additional dataclasses at the module level in your Python code: if the class is for example defined inside a function, the `Binder` constructor will not be able to find it.
+
+### Untyped Data
+
+Sometimes the full structure of the data you want to bind is either too complex or too much in flux to be worth fully annotating.
+In such a situation, you can use `typing.Any` as the annotation to simply capture the output of Python's TOML parser without type-checking it.
+
+In the following example, a service uses the Python standard library logging implementation, configured using the [configuration dictionary schema](https://docs.python.org/3/library/logging.config.html#logging-config-dictschema):
+
+```py
+import logging.config
+from dataclasses import dataclass
+from typing import Any
+
+from dataclass_binder import Binder
+
+
+@dataclass
+class Config:
+    database_url: str
+    logging: Any
+
+
+def run(url: str) -> None:
+    logging.info("Service starting")
+
+
+if __name__ == "__main__":
+    config = Binder[Config].parse_toml("service.toml")
+    logging.config.dictConfig(config.logging)
+    run(config.database_url)
+```
+
+The `service.toml` configuration file for this service could look like this:
+
+```toml
+database-url = 'postgresql://user:password@host/db'
+
+[logging]
+version = 1
+
+[logging.root]
+level = 'INFO'
+handlers = ['file']
+
+[logging.handlers.file]
+class = 'logging.handlers.RotatingFileHandler'
+filename = 'service.log'
+formatter = 'simple'
+
+[logging.formatters.simple]
+format = '%(asctime)s %(name)s %(levelname)s %(message)s'
+```
 
 ### Plugins
 

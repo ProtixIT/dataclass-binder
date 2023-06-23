@@ -571,6 +571,23 @@ def test_bind_mapping_badvalue() -> None:
         Binder[MappingConfig].parse_toml(stream)
 
 
+def test_bind_mapping_any() -> None:
+    """A field annotated with `Any` accepts any parsed TOML data."""
+
+    @dataclass
+    class Config:
+        options: dict[str, Any]
+
+    with stream_text(
+        """
+        options = {the-answer = 42, 'the-question' = false, alphabet = ["a", "b", "c"]}
+        """
+    ) as stream:
+        config = Binder[Config].parse_toml(stream)
+
+    assert config.options == {"the-answer": 42, "the-question": False, "alphabet": ["a", "b", "c"]}
+
+
 def test_bind_datetime() -> None:
     """Dates and times are parsed to classes from the `datetime` module."""
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
 from types import ModuleType, NoneType, UnionType
-from typing import Any, TypeVar, cast, get_args, get_origin
+from typing import Any, TypeVar, Union, cast, get_args, get_origin
 
 import pytest
 
@@ -21,19 +21,21 @@ def format_annotation(annotation: object) -> str:
     if origin is None:
         if annotation is NoneType:
             return "None"
+        elif annotation is Any:
+            return "Any"
         elif annotation is ModuleType:
             return "ModuleType"
         elif isinstance(annotation, type):
             return annotation.__name__
         else:
             raise AssertionError(annotation)
-    elif origin is UnionType:
+    elif origin is UnionType or origin is Union:
         return " | ".join(format_annotation(arg) for arg in get_args(annotation))
     else:
         return f"{origin.__name__}[{', '.join(format_annotation(arg) for arg in get_args(annotation))}]"
 
 
-def single_value_dataclass(value_type: type[Any], *, optional: bool = False, string: bool = False) -> type[Any]:
+def single_value_dataclass(value_type: Any, *, optional: bool = False, string: bool = False) -> type[Any]:
     annotation = value_type | None if optional else value_type
     if string:
         annotation = format_annotation(annotation)
@@ -78,47 +80,60 @@ def round_trip_value(value: T, dc: type[Any]) -> T:
     return cast(T, obj.value)
 
 
-@pytest.mark.parametrize(
-    "value",
-    (
-        -1,
-        0,
-        12345,
-        -1.0,
-        0.0,
-        3.1415927,
-        1.23e30,
-        1.23e-30,
-        True,
-        False,
-        "",
-        "simple",
-        "single'quote",
-        'double"quote',
-        "\"both\" 'quotes'",
-        "embedded\nnewline",
-        r"back\slash",
-        'I\'m a string. "You can quote me". Name\tJos\u00E9\nLocation\tSF.',
-        "complex string with back\\slash, \"both\" 'quotes' and \u0000control\u007Fchars\u0007",
-        "\U0001F44D",
-        date(2022, 10, 5),
-        datetime(2022, 10, 5, 19, 16, 29),
-        time(19, 16, 29),
-        timedelta(hours=12, minutes=34, seconds=56),
-        timedelta(microseconds=99999999999),
-        timedelta(milliseconds=99999999),
-        timedelta(seconds=99999),
-        timedelta(minutes=2000),
-        timedelta(hours=83),
-        timedelta(days=2),
-        timedelta(weeks=3),
-        example,
-    ),
+EXAMPLE_NATIVE_VALUES = (
+    -1,
+    0,
+    12345,
+    -1.0,
+    0.0,
+    3.1415927,
+    1.23e30,
+    1.23e-30,
+    True,
+    False,
+    "",
+    "simple",
+    "single'quote",
+    'double"quote',
+    "\"both\" 'quotes'",
+    "embedded\nnewline",
+    r"back\slash",
+    'I\'m a string. "You can quote me". Name\tJos\u00E9\nLocation\tSF.',
+    "complex string with back\\slash, \"both\" 'quotes' and \u0000control\u007Fchars\u0007",
+    "\U0001F44D",
+    date(2022, 10, 5),
+    datetime(2022, 10, 5, 19, 16, 29),
+    time(19, 16, 29),
 )
+"""Values that have a native representation in TOML."""
+
+EXAMPLE_CONVERTED_VALUES = (
+    timedelta(hours=12, minutes=34, seconds=56),
+    timedelta(microseconds=99999999999),
+    timedelta(milliseconds=99999999),
+    timedelta(seconds=99999),
+    timedelta(minutes=2000),
+    timedelta(hours=83),
+    timedelta(days=2),
+    timedelta(weeks=3),
+    example,
+)
+"""Values for which we have custom conversions."""
+
+
+@pytest.mark.parametrize("value", EXAMPLE_NATIVE_VALUES + EXAMPLE_CONVERTED_VALUES)
 @pytest.mark.parametrize("optional", (True, False))
 @pytest.mark.parametrize("string", (True, False))
-def test_format_value_round_trip(*, value: object, optional: bool, string: bool) -> None:
+def test_format_value_round_trip_exact(*, value: object, optional: bool, string: bool) -> None:
     dc = single_value_dataclass(type(value), optional=optional, string=string)
+    assert round_trip_value(value, dc) == value
+
+
+@pytest.mark.parametrize("value", EXAMPLE_NATIVE_VALUES)
+@pytest.mark.parametrize("optional", (True, False))
+@pytest.mark.parametrize("string", (True, False))
+def test_format_value_round_trip_any(*, value: object, optional: bool, string: bool) -> None:
+    dc = single_value_dataclass(Any, optional=optional, string=string)
     assert round_trip_value(value, dc) == value
 
 
