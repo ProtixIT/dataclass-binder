@@ -101,7 +101,7 @@ For example, it enables automatic generation of a documented configuration file 
 The `dataclass_binder` module contains the `Binder` class which makes it easy to bind TOML data, such as a configuration file, to Python [dataclasses](https://docs.python.org/3/library/dataclasses.html).
 
 The binding is a two-step process:
-- specialize the `Binder` class by using your top-level dataclass as a type argument
+- instantiate the `Binder` class by passing your top-level dataclass as an argument
 - call the `parse_toml()` method, providing the path of the configuration file as its argument
 
 Put together, the code looks like this:
@@ -119,7 +119,7 @@ logger = logging.getLogger(__name__)
 if __name__ == "__main__":
     config_file = Path("config.toml")
     try:
-        config = Binder[Config].parse_toml(config_file)
+        config = Binder(Config).parse_toml(config_file)
     except Exception as ex:
         logger.critical("Error reading configuration file '%s': %s", config_file, ex)
         sys.exit(1)
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 ### Binding a Pre-parsed Dictionary
 
 If you don't want to bind the contents of a full file, there is also the option to bind a pre-parsed dictionary instead.
-For this, you can use the `bind()` method on the specialized `Binder` class.
+For this, you can use the `bind()` method on the `Binder` object.
 
 For example, the following service uses a hybrid configuration format where a single file configures both the service itself and logging system:
 
@@ -141,7 +141,7 @@ from dataclass_binder import Binder
 
 with open("config.toml", "rb") as f:
     config = tomllib.load(f)
-service_config = Binder[ServiceConfig].bind(config["service"])
+service_config = Binder(ServiceConfig).bind(config["service"])
 logging.config.dictConfig(config["logging"])
 ```
 
@@ -283,7 +283,7 @@ url = "https://host2/hook"
 token = "frperg"
 ```
 
-Always define additional dataclasses at the module level in your Python code: if the class is for example defined inside a function, the `Binder` specialization will not be able to find it.
+Always define additional dataclasses at the module level in your Python code: if the class is for example defined inside a function, the `Binder` constructor will not be able to find it.
 
 ### Plugins
 
@@ -390,7 +390,7 @@ port = 8080
 
 ### Troubleshooting
 
-Finally, a troubleshooting tip: instead of the full `Binder[Config].parse_toml()`, first try to execute only `Binder[Config]`.
+Finally, a troubleshooting tip: instead of the full `Binder(Config).parse_toml()`, first try to execute only `Binder(Config)`.
 If that fails, the problem is in the dataclass definitions.
 If that succeeds, but the `parse_toml()` call fails, the problem is that the TOML file does not match the format defined in the dataclasses.
 
@@ -419,6 +419,12 @@ After you first set up your virtual environment with Poetry, run this command to
 - Create a release on the GitHub web interface; name the tag `v<major>.<minor>.<patchlevel>`
 - After publishing the release on GitHub, the package will be built and published on PyPI automatically via Actions
 
+
+## Deprecations
+
+### Binder Specialization
+
+Prior to version 0.2.0, the `Binder` class was specialized using a type argument (`Binder[Config]`) rather than instantiation (`Binder(config)`). The old syntax is still supported for now, but the backwards compatibility might be removed in a minor release prior to 1.0 if it becomes a maintenance burden, so please update your code.
 
 ## Changelog
 
