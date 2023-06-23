@@ -207,16 +207,16 @@ class Binder(Generic[T], metaclass=_BinderCache):
     Binds TOML data to a specific dataclass.
     """
 
-    __slots__ = ("_config_class", "_field_types")
-    _config_class: type[T]
+    __slots__ = ("_dataclass", "_field_types")
+    _dataclass: type[T]
     _field_types: Mapping[str, type | Binder[Any]]
 
-    def __class_getitem__(cls: type[Binder[T]], config_class: type[T]) -> Binder[T]:
+    def __class_getitem__(cls: type[Binder[T]], dataclass: type[T]) -> Binder[T]:
         """Deprecated: use `Binder(MyDataClass)` instead."""
-        return cls(config_class)
+        return cls(dataclass)
 
     def __init__(self, dataclass: type[T]) -> None:
-        self._config_class = dataclass
+        self._dataclass = dataclass
         self._field_types = {
             field_name: _collect_type(field_type, f"{dataclass.__name__}.{field_name}")
             for field_name, field_type in _get_fields(dataclass)
@@ -347,7 +347,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
                         )
                 else:
                     type_name = (
-                        field_type._config_class if isinstance(field_type, Binder) else field_type  # noqa: SLF001
+                        field_type._dataclass if isinstance(field_type, Binder) else field_type  # noqa: SLF001
                     ).__name__
                     raise ValueError(
                         f"Field '{context}.{field_name}' has type '{type_name}', "
@@ -356,7 +356,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
 
             parsed[field_name] = self._bind_to_field(value, field_type, f"{context}.{field_name}")
 
-        return self._config_class(**parsed)
+        return self._dataclass(**parsed)
 
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
@@ -372,7 +372,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
     else:
 
         def bind(self, data: Mapping[str, Any]) -> T:
-            return self._bind_to_class(data, self._config_class.__name__)
+            return self._bind_to_class(data, self._dataclass.__name__)
 
         def parse_toml(self, file: BinaryIO | str | Path) -> T:
             match file:
@@ -535,7 +535,7 @@ def _iter_format_value(value: object) -> Iterator[str]:
             raise TypeError(type(value).__name__)
 
 
-def get_field_docstrings(config_class: type[Any]) -> Mapping[str, str]:
+def get_field_docstrings(dataclass: type[Any]) -> Mapping[str, str]:
     """
     Return a mapping of field name to the docstring for that field.
 
@@ -544,7 +544,7 @@ def get_field_docstrings(config_class: type[Any]) -> Mapping[str, str]:
     """
 
     try:
-        source = getsource(config_class)
+        source = getsource(dataclass)
     except (OSError, TypeError):
         # According to the documentation only OSError can be raised, but Python 3.10 raises TypeError for
         # sourceless dataclasses.
@@ -572,23 +572,23 @@ def get_field_docstrings(config_class: type[Any]) -> Mapping[str, str]:
 
 def format_template(class_or_instance: Any) -> Iterator[str]:
     """
-    Yield lines of TOML text as a template for configuring the given data class or instance.
+    Yield lines of TOML text as a template for populating the given data class or instance.
 
     If an instance is provided, values from that instance will be used to populate the template.
     If a class is provided, values will be derived from the field types.
     """
 
     if isinstance(class_or_instance, type):
-        config_class = class_or_instance
+        dataclass = class_or_instance
         instance = None
     else:
-        config_class = class_or_instance.__class__
+        dataclass = class_or_instance.__class__
         instance = class_or_instance
 
-    docstrings = get_field_docstrings(config_class)
+    docstrings = get_field_docstrings(dataclass)
 
     first = True
-    for field in fields(config_class):
+    for field in fields(dataclass):
         if not field.init:
             continue
 
@@ -619,7 +619,7 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
             if value is None:
                 comment = "# " if default is None else ""
                 key_fmt = "".join(_iter_format_key(key))
-                value_fmt = _format_value_for_field(config_class, field)
+                value_fmt = _format_value_for_field(dataclass, field)
                 yield f"{comment}{key_fmt} = {value_fmt}"
         else:
             yield "# Default:"
@@ -628,13 +628,13 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
             yield f"{format_toml_pair(key, value)}"
 
 
-def _format_value_for_field(config_class: type[Any], field: Field) -> str:
+def _format_value_for_field(dataclass: type[Any], field: Field) -> str:
     """Format an example value or placeholder for a value depending on the given field's type."""
 
     annotated_type: type[Any] | str | None = field.type
     if isinstance(annotated_type, str):
         module_locals = {}
-        module = getmodule(config_class)
+        module = getmodule(dataclass)
         if module is not None:
             for name in dir(module):
                 module_locals[name] = getattr(module, name)
@@ -645,7 +645,7 @@ def _format_value_for_field(config_class: type[Any], field: Field) -> str:
     else:
         evaluated_type = annotated_type
 
-    field_type = _collect_type(evaluated_type, f"{config_class.__name__}.{field.name}")
+    field_type = _collect_type(evaluated_type, f"{dataclass.__name__}.{field.name}")
     return _format_value_for_type(field_type)
 
 
@@ -669,7 +669,7 @@ def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
         elif field_type is time or field_type is timedelta:
             return "00:00:00"
         elif isinstance(field_type, Binder):
-            return "".join(_format_fields_inline(field_type._config_class))  # noqa: SLF001
+            return "".join(_format_fields_inline(field_type._dataclass))  # noqa: SLF001
         else:
             # We have handled all the non-generic types supported by _collect_type().
             raise AssertionError(field_type)
@@ -686,15 +686,15 @@ def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
         raise AssertionError(origin)
 
 
-def _format_fields_inline(config_class: type[Any]) -> Iterable[str]:
+def _format_fields_inline(dataclass: type[Any]) -> Iterable[str]:
     yield "{"
     first = True
-    for field in fields(config_class):
+    for field in fields(dataclass):
         if first:
             first = False
         else:
             yield ", "
         yield from _iter_format_key(field.name.replace("_", "-"))
         yield " = "
-        yield _format_value_for_field(config_class, field)
+        yield _format_value_for_field(dataclass, field)
     yield "}"
