@@ -32,16 +32,25 @@ def parse_toml(dc: type[T], toml: str) -> T:
         return binder.parse_toml(stream)
 
 
-def round_trip(value: T, dc: type[Any]) -> T:
+def round_trip(obj: T) -> T:
+    """
+    Convert data in a dataclass to TOML and back.
+    """
+
+    toml = "\n".join(format_template(obj))
+    print(f"TOML <- {obj!r}")  # noqa: T201
+    print(toml)  # noqa: T201
+    return parse_toml(type(obj), toml)
+
+
+def round_trip_value(value: T, dc: type[Any]) -> T:
     """
     Convert data in a dataclass to TOML and back.
 
     The dataclass must have a single field named "value".
     """
 
-    toml = format_toml_pair("value", value)
-    print(repr(value), "->", toml)  # noqa: T201
-    obj = parse_toml(dc, toml)
+    obj = round_trip(dc(value=value))
     return cast(T, obj.value)
 
 
@@ -84,19 +93,19 @@ def round_trip(value: T, dc: type[Any]) -> T:
 )
 def test_format_value_round_trip(value: object) -> None:
     dc = single_value_dataclass(type(value))
-    assert round_trip(value, dc) == value
+    assert round_trip_value(value, dc) == value
 
 
 def test_format_value_class() -> None:
     dc = single_value_dataclass(type)
-    assert round_trip(example.Config, dc) is example.Config
+    assert round_trip_value(example.Config, dc) is example.Config
 
 
 def test_format_value_list_simple() -> None:
     """A sequence is formatted as a TOML array."""
     value = [1, 2, 3]
     dc = single_value_dataclass(list[int])
-    assert round_trip(value, dc) == value
+    assert round_trip_value(value, dc) == value
 
 
 def test_format_value_list_suffix() -> None:
@@ -106,12 +115,12 @@ def test_format_value_list_suffix() -> None:
     TODO: Reconsider the design decision to use key suffixes, as it leads to this gap in expressiveness.
     """
     dc = single_value_dataclass(list[timedelta])
-    assert round_trip([], dc) == []
-    assert round_trip([timedelta(hours=2)], dc) == [timedelta(hours=2)]
+    assert round_trip_value([], dc) == []
+    assert round_trip_value([timedelta(hours=2)], dc) == [timedelta(hours=2)]
     with pytest.raises(
         ValueError, match=r"^Value datetime\.timedelta\(days=2\) in array cannot be expressed without key suffix$"
     ):
-        round_trip([timedelta(days=2)], dc)
+        round_trip_value([timedelta(days=2)], dc)
 
 
 def test_format_value_dict() -> None:
@@ -123,12 +132,12 @@ def test_format_value_dict() -> None:
     dc = single_value_dataclass(dict[str, int])
     value = {"a": 1, "b": 2, "c": 3}
     assert format_toml_pair("value", value) == "value = {a = 1, b = 2, c = 3}"
-    assert round_trip(value, dc) == value
+    assert round_trip_value(value, dc) == value
     value["a space"] = 4
     value["a.dot"] = 5
     value[""] = 6
     assert format_toml_pair("value", value) == "value = {a = 1, b = 2, c = 3, 'a space' = 4, 'a.dot' = 5, '' = 6}"
-    assert round_trip(value, dc) == value
+    assert round_trip_value(value, dc) == value
 
 
 def test_format_value_dict_suffix() -> None:
@@ -140,8 +149,8 @@ def test_format_value_dict_suffix() -> None:
           see test_format_value_list_suffix() for details.
     """
     dc = single_value_dataclass(dict[str, timedelta])
-    assert round_trip({}, dc) == {}
-    assert round_trip({"delay": timedelta(hours=2)}, dc) == {"delay": timedelta(hours=2)}
+    assert round_trip_value({}, dc) == {}
+    assert round_trip_value({"delay": timedelta(hours=2)}, dc) == {"delay": timedelta(hours=2)}
     # assert round_trip({"delay": timedelta(days=2)}, dc) == {"delay": timedelta(days=2)}  # noqa: ERA001
     assert format_toml_pair("value", {"delay": timedelta(days=2)}) == "value = {delay-days = 2}"
 
@@ -154,7 +163,7 @@ def test_format_value_nested_dataclass() -> None:
 
     dc = single_value_dataclass(Inner)
     value = Inner(key_containing_underscores=True, maybesuffix=timedelta(days=2))
-    assert round_trip(value, dc) == value
+    assert round_trip_value(value, dc) == value
 
 
 def test_format_value_unsupported_type() -> None:
