@@ -492,3 +492,9 @@ Prior to version 0.2.0, the `Binder` class was specialized using a type argument
 ### 0.1.3 - 2023-03-05:
 
 - Ignore dataclass fields with `init=False` ([#2](https://github.com/ProtixIT/dataclass-binder/issues/2))
+
+### 0.2.0 - 2023-06-26:
+
+- Instantiate `Binder` instead of specializing it ([#14](https://github.com/ProtixIT/dataclass-binder/pull/14))
+- Support `typing.Any` as a field annotation ([#10](https://github.com/ProtixIT/dataclass-binder/issues/10))
+- Fix crash in `format_template()` on optional fields with non-string annotations ([#16](https://github.com/ProtixIT/dataclass-binder/pull/16))
