@@ -191,9 +191,9 @@ class _BinderCache(type, Generic[T]):
     Cache that returns a dedicated `Binder` instance for each dataclass.
     """
 
-    _cache: MutableMapping[T, Binder[T]] = WeakKeyDictionary()
+    _cache: MutableMapping[type[T], Binder[T]] = WeakKeyDictionary()
 
-    def __call__(cls, dataclass: T) -> Binder[T]:
+    def __call__(cls, dataclass: type[T]) -> Binder[T]:
         try:
             return cls._cache[dataclass]
         except KeyError:
