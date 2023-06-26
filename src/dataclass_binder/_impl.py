@@ -15,7 +15,7 @@ from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
 from pathlib import Path
 from textwrap import dedent
 from types import MappingProxyType, ModuleType, NoneType, UnionType
-from typing import TYPE_CHECKING, Any, BinaryIO, Generic, TypeVar, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Any, BinaryIO, Generic, TypeVar, Union, cast, get_args, get_origin, overload
 from weakref import WeakKeyDictionary
 
 if sys.version_info < (3, 11):
@@ -193,15 +193,24 @@ class _BinderCache(type, Generic[T]):
 
     _cache: MutableMapping[type[T], Binder[T]] = WeakKeyDictionary()
 
-    def __call__(cls, dataclass: type[T]) -> Binder[T]:
-        try:
-            return cls._cache[dataclass]
-        except KeyError:
-            pass
+    def __call__(cls, class_or_instance: type[T] | T) -> Binder[T]:
+        if isinstance(class_or_instance, type):
+            instance = None
+            dataclass = class_or_instance
+        else:
+            instance = class_or_instance
+            dataclass = instance.__class__
 
-        instance: Binder[T] = super().__call__(dataclass)
-        cls._cache[dataclass] = instance
-        return instance
+        try:
+            binder = cls._cache[dataclass]
+        except KeyError:
+            binder = super().__call__(dataclass, None)
+            cls._cache[dataclass] = binder
+
+        if instance is None:
+            return binder
+        else:
+            return binder._replace_instance(instance)
 
 
 class Binder(Generic[T], metaclass=_BinderCache):
@@ -209,20 +218,42 @@ class Binder(Generic[T], metaclass=_BinderCache):
     Binds TOML data to a specific dataclass.
     """
 
-    __slots__ = ("_dataclass", "_field_types")
+    __slots__ = ("_dataclass", "_instance", "_field_types")
     _dataclass: type[T]
+    _instance: T | None
     _field_types: Mapping[str, type | Binder[Any]]
 
     def __class_getitem__(cls: type[Binder[T]], dataclass: type[T]) -> Binder[T]:
         """Deprecated: use `Binder(MyDataClass)` instead."""
         return cls(dataclass)
 
-    def __init__(self, dataclass: type[T]) -> None:
-        self._dataclass = dataclass
-        self._field_types = {
-            field_name: _collect_type(field_type, f"{dataclass.__name__}.{field_name}")
-            for field_name, field_type in _get_fields(dataclass)
-        }
+    if TYPE_CHECKING:
+
+        @overload
+        def __init__(self, class_or_instance: type[T]) -> None:
+            ...
+
+        @overload
+        def __init__(self, class_or_instance: T) -> None:
+            ...
+
+        def __init__(self, class_or_instance: type[T] | T) -> None:
+            ...
+
+    else:
+
+        def __init__(self, dataclass: type[T], instance: T | None) -> None:
+            self._dataclass = dataclass
+            self._instance = instance
+            self._field_types = {
+                field_name: _collect_type(field_type, f"{dataclass.__name__}.{field_name}")
+                for field_name, field_type in _get_fields(dataclass)
+            }
+
+    def _replace_instance(self, instance: T) -> Binder[T]:
+        binder = self.__class__.__new__(self.__class__)
+        binder.__init__(self._dataclass, instance)  # type: ignore[misc]
+        return binder
 
     def _bind_to_single_type(self, value: object, field_type: type | Binder[Any], context: str) -> object:
         """

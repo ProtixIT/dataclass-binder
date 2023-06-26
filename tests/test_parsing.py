@@ -125,6 +125,13 @@ def test_bind_file(tmp_path: Path) -> None:
     assert config.import_max_nr_hours == 24
 
 
+def test_bind_dataclass_instance() -> None:
+    instance = Config(rest_api_port=6000)
+    binder = Binder(instance)
+    assert binder._dataclass is Config
+    assert binder._instance is instance
+
+
 def test_bind_inheritance() -> None:
     """A dataclass inheriting from another dataclass accepts fields from both the base and the subclass."""
 
