@@ -7,7 +7,7 @@ import operator
 import re
 import sys
 from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
-from dataclasses import MISSING, Field, dataclass, fields, is_dataclass, replace
+from dataclasses import MISSING, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import reduce
 from importlib import import_module
@@ -442,13 +442,26 @@ class Binder(Generic[T]):
                 if value is None:
                     comment = "# " if default is None else ""
                     key_fmt = "".join(_iter_format_key(key))
-                    value_fmt = _format_value_for_field(dataclass, field)
+                    value_fmt = _format_value_for_type(self._class_info.field_types[field.name])
                     yield f"{comment}{key_fmt} = {value_fmt}"
             else:
                 yield "# Default:"
                 yield f"# {format_toml_pair(key, default)}"
             if value is not None:
                 yield f"{format_toml_pair(key, value)}"
+
+    def _format_inline(self) -> Iterable[str]:
+        yield "{"
+        first = True
+        for field_name, field_type in self._class_info.field_types.items():
+            if first:
+                first = False
+            else:
+                yield ", "
+            yield from _iter_format_key(field_name.replace("_", "-"))
+            yield " = "
+            yield _format_value_for_type(field_type)
+        yield "}"
 
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
@@ -669,27 +682,6 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
     yield from Binder(class_or_instance).format_template()
 
 
-def _format_value_for_field(dataclass: type[Any], field: Field) -> str:
-    """Format an example value or placeholder for a value depending on the given field's type."""
-
-    annotated_type: type[Any] | str | None = field.type
-    if isinstance(annotated_type, str):
-        module_locals = {}
-        module = getmodule(dataclass)
-        if module is not None:
-            for name in dir(module):
-                module_locals[name] = getattr(module, name)
-        try:
-            evaluated_type = eval(annotated_type, globals(), module_locals)  # noqa: PGH001
-        except Exception:
-            return "???"
-    else:
-        evaluated_type = annotated_type
-
-    field_type = _collect_type(evaluated_type, f"{dataclass.__name__}.{field.name}")
-    return _format_value_for_type(field_type)
-
-
 def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
     origin = get_origin(field_type)
     if origin is None:
@@ -710,7 +702,7 @@ def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
         elif field_type is time or field_type is timedelta:
             return "00:00:00"
         elif isinstance(field_type, Binder):
-            return "".join(_format_fields_inline(field_type._dataclass))
+            return "".join(field_type._format_inline())
         else:
             # We have handled all the non-generic types supported by _collect_type().
             raise AssertionError(field_type)
@@ -725,17 +717,3 @@ def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
     else:
         # This is currently unreachable because we reject unsupported generic types in _collect_type().
         raise AssertionError(origin)
-
-
-def _format_fields_inline(dataclass: type[Any]) -> Iterable[str]:
-    yield "{"
-    first = True
-    for field in fields(dataclass):
-        if first:
-            first = False
-        else:
-            yield ", "
-        yield from _iter_format_key(field.name.replace("_", "-"))
-        yield " = "
-        yield _format_value_for_field(dataclass, field)
-    yield "}"
