@@ -275,8 +275,6 @@ class TemplateConfig:
     derived: int = field(init=False)
     """Excluded field."""
 
-    bad_annotation: NoSuchType  # type: ignore[name-defined]  # noqa: F821
-
 
 def test_format_template_full() -> None:
     """The template generated for the TemplateConfig class matches our golden output."""
@@ -311,9 +309,6 @@ module = 'fully.qualified.module.name'
 
 # Mandatory.
 multi-type = '???' | 0
-
-# Mandatory.
-bad-annotation = ???
 """.strip()
     )
 

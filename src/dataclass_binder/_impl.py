@@ -385,6 +385,61 @@ class Binder(Generic[T]):
         else:
             return replace(instance, **parsed)  # type: ignore[type-var]
 
+    def format_template(self) -> Iterator[str]:
+        """
+        Yield lines of TOML text as a template for populating the dataclass or object that we are binding to.
+
+        A template in this case means it is suitable as a starting point for a user to fill in;
+        the template is not guaranteed to be parseable as-is.
+
+        If we are binding to an object, values from that object will be used to populate the template.
+        If we are binding to a class, example values will be derived from the field types.
+        """
+
+        dataclass = self._dataclass
+        instance = self._instance
+        docstrings = get_field_docstrings(dataclass)
+
+        first = True
+        for field in fields(dataclass):  # type: ignore[arg-type]
+            if not field.init:
+                continue
+
+            if first:
+                first = False
+            else:
+                yield ""
+
+            docstring = docstrings.get(field.name)
+            lines = docstring.split("\n") if docstring else []
+            # End with an empty line if the docstring contains multiple paragraphs.
+            if "" in lines:
+                lines.append("")
+
+            for line in lines:
+                yield f"# {line}".rstrip()
+
+            key = field.name.replace("_", "-")
+            value = None if instance is None else getattr(instance, field.name)
+            default = field.default
+            if value == default:
+                value = None
+            if default is MISSING or default is None:
+                if default is None:
+                    yield "# Optional."
+                else:
+                    yield "# Mandatory."
+                if value is None:
+                    comment = "# " if default is None else ""
+                    key_fmt = "".join(_iter_format_key(key))
+                    value_fmt = _format_value_for_field(dataclass, field)
+                    yield f"{comment}{key_fmt} = {value_fmt}"
+            else:
+                yield "# Default:"
+                yield f"# {format_toml_pair(key, default)}"
+            if value is not None:
+                yield f"{format_toml_pair(key, value)}"
+
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
 
@@ -600,61 +655,8 @@ def get_field_docstrings(dataclass: type[Any]) -> Mapping[str, str]:
 
 
 def format_template(class_or_instance: Any) -> Iterator[str]:
-    """
-    Yield lines of TOML text as a template for populating the given data class or instance.
-
-    If an instance is provided, values from that instance will be used to populate the template.
-    If a class is provided, values will be derived from the field types.
-    """
-
-    if isinstance(class_or_instance, type):
-        dataclass = class_or_instance
-        instance = None
-    else:
-        dataclass = class_or_instance.__class__
-        instance = class_or_instance
-
-    docstrings = get_field_docstrings(dataclass)
-
-    first = True
-    for field in fields(dataclass):
-        if not field.init:
-            continue
-
-        if first:
-            first = False
-        else:
-            yield ""
-
-        docstring = docstrings.get(field.name)
-        lines = docstring.split("\n") if docstring else []
-        # End with an empty line if the docstring contains multiple paragraphs.
-        if "" in lines:
-            lines.append("")
-
-        for line in lines:
-            yield f"# {line}".rstrip()
-
-        key = field.name.replace("_", "-")
-        value = None if instance is None else getattr(instance, field.name)
-        default = field.default
-        if value == default:
-            value = None
-        if default is MISSING or default is None:
-            if default is None:
-                yield "# Optional."
-            else:
-                yield "# Mandatory."
-            if value is None:
-                comment = "# " if default is None else ""
-                key_fmt = "".join(_iter_format_key(key))
-                value_fmt = _format_value_for_field(dataclass, field)
-                yield f"{comment}{key_fmt} = {value_fmt}"
-        else:
-            yield "# Default:"
-            yield f"# {format_toml_pair(key, default)}"
-        if value is not None:
-            yield f"{format_toml_pair(key, value)}"
+    """Deprecated: use `Binder.format_template()` instead."""
+    yield from Binder(class_or_instance).format_template()
 
 
 def _format_value_for_field(dataclass: type[Any], field: Field) -> str:
