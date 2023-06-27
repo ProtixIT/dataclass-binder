@@ -7,7 +7,7 @@ import operator
 import re
 import sys
 from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
-from dataclasses import MISSING, Field, fields, is_dataclass
+from dataclasses import MISSING, Field, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import reduce
 from importlib import import_module
@@ -289,7 +289,9 @@ class Binder(Generic[T], metaclass=_BinderCache):
             if not isinstance(value, dict):
                 raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
             key_type, elem_type = get_args(field_type)
-            mapping = {key: self._bind_to_field(elem, elem_type, f'{context}["{key}"]') for key, elem in value.items()}
+            mapping = {
+                key: self._bind_to_field(elem, elem_type, None, f'{context}["{key}"]') for key, elem in value.items()
+            }
             return (
                 (mapping if isinstance(origin, MutableMapping) else MappingProxyType(mapping))
                 if isabstract(origin)
@@ -302,7 +304,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
             if issubclass(origin, tuple):
                 if len(type_args) == len(value):
                     return tuple(
-                        self._bind_to_field(elem, elem_type, f"{context}[{index}]")
+                        self._bind_to_field(elem, elem_type, None, f"{context}[{index}]")
                         for index, (elem, elem_type) in enumerate(zip(value, type_args, strict=True))
                     )
                 else:
@@ -312,7 +314,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
                 (list if isinstance(origin, MutableSequence) else tuple) if isabstract(origin) else field_type
             )
             return container_class(
-                self._bind_to_field(elem, elem_type, f"{context}[{index}]") for index, elem in enumerate(value)
+                self._bind_to_field(elem, elem_type, None, f"{context}[{index}]") for index, elem in enumerate(value)
             )
         elif origin is type:
             if not isinstance(value, str):
@@ -334,7 +336,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
 
         raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected '{field_type.__name__}'")
 
-    def _bind_to_field(self, value: object, field_type: type | Binder[Any], context: str) -> object:
+    def _bind_to_field(self, value: object, field_type: type | Binder[Any], instance: T | None, context: str) -> object:
         """
         Convert a TOML value to a field type which is possibly a union type.
 
@@ -346,7 +348,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
                 if isinstance(field_type, Binder):
                     if not isinstance(value, dict):
                         raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
-                    return field_type._bind_to_class(value, context)
+                    return field_type._bind_to_class(value, instance, context)
                 else:
                     return self._bind_to_single_type(value, target_type, context)
             except TypeError:
@@ -358,7 +360,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
                 #       It would be cleaner to limit custom classes to one at collection time.
         raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected '{field_type}'")
 
-    def _bind_to_class(self, toml_dict: Mapping[str, Any], context: str) -> T:
+    def _bind_to_class(self, toml_dict: Mapping[str, Any], instance: T | None, context: str) -> T:
         field_types = self._field_types
         parsed = {}
         for key, value in toml_dict.items():
@@ -387,9 +389,17 @@ class Binder(Generic[T], metaclass=_BinderCache):
                         f"which does not support suffix '{suffix}'"
                     )
 
-            parsed[field_name] = self._bind_to_field(value, field_type, f"{context}.{field_name}")
+            parsed[field_name] = self._bind_to_field(
+                value,
+                field_type,
+                None if instance is None else getattr(instance, field_name),
+                f"{context}.{field_name}",
+            )
 
-        return self._dataclass(**parsed)
+        if instance is None:
+            return self._dataclass(**parsed)
+        else:
+            return replace(instance, **parsed)  # type: ignore[type-var]
 
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
@@ -405,7 +415,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
     else:
 
         def bind(self, data: Mapping[str, Any]) -> T:
-            return self._bind_to_class(data, self._dataclass.__name__)
+            return self._bind_to_class(data, self._instance, self._dataclass.__name__)
 
         def parse_toml(self, file: BinaryIO | str | Path) -> T:
             match file:

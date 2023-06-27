@@ -125,13 +125,6 @@ def test_bind_file(tmp_path: Path) -> None:
     assert config.import_max_nr_hours == 24
 
 
-def test_bind_dataclass_instance() -> None:
-    instance = Config(rest_api_port=6000)
-    binder = Binder(instance)
-    assert binder._dataclass is Config
-    assert binder._instance is instance
-
-
 def test_bind_inheritance() -> None:
     """A dataclass inheriting from another dataclass accepts fields from both the base and the subclass."""
 
@@ -1007,3 +1000,51 @@ def test_bind_excluded_from_init() -> None:
         pytest.raises(ValueError, match=r"^Field 'SumConfig\.total' does not exist$"),
     ):
         Binder(SumConfig).parse_toml(stream)
+
+
+@dataclass
+class Nested:
+    value: str
+
+
+@dataclass(kw_only=True)
+class TopLevel:
+    priority: int
+    flag: bool = False
+    nested1: Nested
+    nested2: Nested
+
+
+def test_bind_merge() -> None:
+    """
+    A binder constructed from a dataclass instance uses that instance as defaults,
+    for the top level and any nested dataclasses (unless they are part of collections).
+    """
+
+    with stream_text(
+        """
+        priority = 99
+
+        [nested1]
+        value = "sun"
+
+        [nested2]
+        value = "moon"
+        """
+    ) as stream:
+        system_config = Binder(TopLevel).parse_toml(stream)
+
+    with stream_text(
+        """
+        flag = true
+
+        [nested2]
+        value = "cheese"
+        """
+    ) as stream:
+        merged_config = Binder(system_config).parse_toml(stream)
+
+    assert merged_config.priority == 99
+    assert merged_config.flag is True
+    assert merged_config.nested1.value == "sun"
+    assert merged_config.nested2.value == "cheese"
