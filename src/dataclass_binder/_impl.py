@@ -474,6 +474,8 @@ def _to_toml_pair(value: object) -> tuple[str | None, Any]:
         case _ if is_dataclass(value):
             table = {}
             for field in fields(value):
+                if not field.init:
+                    continue
                 name = field.name
                 sub_value = getattr(value, name)
                 if sub_value is None:
