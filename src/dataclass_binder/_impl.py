@@ -191,9 +191,9 @@ class _BinderCache(type, Generic[T]):
     Cache that returns a dedicated `Binder` instance for each dataclass.
     """
 
-    _cache: MutableMapping[T, Binder[T]] = WeakKeyDictionary()
+    _cache: MutableMapping[type[T], Binder[T]] = WeakKeyDictionary()
 
-    def __call__(cls, dataclass: T) -> Binder[T]:
+    def __call__(cls, dataclass: type[T]) -> Binder[T]:
         try:
             return cls._cache[dataclass]
         except KeyError:
@@ -233,7 +233,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
         if isinstance(field_type, Binder):
             if not isinstance(value, dict):
                 raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
-            return field_type._bind_to_class(value, context)  # noqa: SLF001
+            return field_type._bind_to_class(value, context)
         origin = get_origin(field_type)
         if origin is None:
             if field_type is ModuleType:
@@ -350,9 +350,7 @@ class Binder(Generic[T], metaclass=_BinderCache):
                             f"has type '{type(value).__name__}', expected number"
                         )
                 else:
-                    type_name = (
-                        field_type._dataclass if isinstance(field_type, Binder) else field_type  # noqa: SLF001
-                    ).__name__
+                    type_name = (field_type._dataclass if isinstance(field_type, Binder) else field_type).__name__
                     raise ValueError(
                         f"Field '{context}.{field_name}' has type '{type_name}', "
                         f"which does not support suffix '{suffix}'"
@@ -673,7 +671,7 @@ def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
         elif field_type is time or field_type is timedelta:
             return "00:00:00"
         elif isinstance(field_type, Binder):
-            return "".join(_format_fields_inline(field_type._dataclass))  # noqa: SLF001
+            return "".join(_format_fields_inline(field_type._dataclass))
         else:
             # We have handled all the non-generic types supported by _collect_type().
             raise AssertionError(field_type)
