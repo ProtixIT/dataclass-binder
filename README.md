@@ -374,6 +374,22 @@ class Config:
     limits: Mapping[str, int]
 ```
 
+### Layered Binding
+
+`Binder` can be instantiated from a dataclass object rather than the dataclass itself.
+The dataclass object will provide new default values when binding data to it.
+This can be used to implement a layered configuration parsing mechanism, where there is a default configuration that can be customized using a system-wide configuration file and/or a per-user configuration file:
+
+```py
+config = Config()
+if system_config_path.exists():
+    config = Binder(config).parse_toml(system_config_path)
+if user_config_path.exists():
+    config = Binder(config).parse_toml(user_config_path)
+```
+
+Later layers can override individual fields in nested dataclasses, allowing fine-grained configuration merging, but collections are replaced whole instead of merged.
+
 ### Generating a Configuration Template
 
 To provide users with a starting point for configuring your application/service, you can automatically generate a configuration template from the information in the dataclass.
