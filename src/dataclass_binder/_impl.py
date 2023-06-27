@@ -186,12 +186,14 @@ _TIMEDELTA_SUFFIXES = {"days", "seconds", "microseconds", "milliseconds", "minut
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(slots=True)
 class _ClassInfo(Generic[T]):
 
     _cache: ClassVar[MutableMapping[type[Any], _ClassInfo[Any]]] = WeakKeyDictionary()
 
+    dataclass: type[T]
     field_types: Mapping[str, type | Binder[Any]]
+    _field_docstrings: Mapping[str, str] | None = None
 
     @classmethod
     def get(cls, dataclass: type[T]) -> _ClassInfo[T]:
@@ -199,13 +201,21 @@ class _ClassInfo(Generic[T]):
             return cls._cache[dataclass]
         except KeyError:
             info = cls(
+                dataclass,
                 {
                     field_name: _collect_type(field_type, f"{dataclass.__name__}.{field_name}")
                     for field_name, field_type in _get_fields(dataclass)
-                }
+                },
             )
             cls._cache[dataclass] = info
             return info
+
+    @property
+    def field_docstrings(self) -> Mapping[str, str]:
+        field_docstrings = self._field_docstrings
+        if field_docstrings is None:
+            self._field_docstrings = field_docstrings = get_field_docstrings(self.dataclass)
+        return field_docstrings
 
 
 class Binder(Generic[T]):
@@ -398,7 +408,7 @@ class Binder(Generic[T]):
 
         dataclass = self._dataclass
         instance = self._instance
-        docstrings = get_field_docstrings(dataclass)
+        docstrings = self._class_info.field_docstrings
 
         first = True
         for field in fields(dataclass):  # type: ignore[arg-type]
