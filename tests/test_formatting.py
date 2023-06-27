@@ -210,6 +210,7 @@ def test_format_value_dict_suffix(*, optional: bool, string: bool) -> None:
 class Inner:
     key_containing_underscores: bool
     maybesuffix: timedelta
+    behind_the_curtain: str = field(init=False, default="wizard")
 
 
 @pytest.mark.parametrize("optional", (True, False))
