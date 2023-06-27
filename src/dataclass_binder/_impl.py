@@ -213,10 +213,10 @@ class Binder(Generic[T]):
     Binds TOML data to a specific dataclass.
     """
 
-    __slots__ = ("_dataclass", "_instance", "_field_types")
+    __slots__ = ("_dataclass", "_instance", "_class_info")
     _dataclass: type[T]
     _instance: T | None
-    _field_types: Mapping[str, type | Binder[Any]]
+    _class_info: _ClassInfo[T]
 
     def __class_getitem__(cls: type[Binder[T]], dataclass: type[T]) -> Binder[T]:
         """Deprecated: use `Binder(MyDataClass)` instead."""
@@ -237,7 +237,7 @@ class Binder(Generic[T]):
         else:
             self._dataclass = dataclass = class_or_instance.__class__
             self._instance = class_or_instance
-        self._field_types = _ClassInfo.get(dataclass).field_types
+        self._class_info = _ClassInfo.get(dataclass)
 
     def _bind_to_single_type(self, value: object, field_type: type, context: str) -> object:
         """
@@ -345,7 +345,7 @@ class Binder(Generic[T]):
         raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected '{field_type}'")
 
     def _bind_to_class(self, toml_dict: Mapping[str, Any], instance: T | None, context: str) -> T:
-        field_types = self._field_types
+        field_types = self._class_info.field_types
         parsed = {}
         for key, value in toml_dict.items():
             if "_" in key:
