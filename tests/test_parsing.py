@@ -69,17 +69,6 @@ def test_find_object_by_name_missing() -> None:
         _find_object_by_name("dataclass_binder.no-such-name", "Config.bad_class")
 
 
-def test_binder_specialization() -> None:
-    """The deprecated `Binder[DT]` syntax is still supported."""
-
-    @dataclass
-    class Dummy:
-        pass
-
-    # By using `is` we test the caching as well.
-    assert Binder[Dummy] is Binder(Dummy)  # type: ignore[comparison-overlap]
-
-
 @dataclass(frozen=True)
 class Config:
     rest_api_port: int
@@ -101,6 +90,21 @@ def test_bind_simple() -> None:
         """
     ) as stream:
         config = Binder(Config).parse_toml(stream)
+
+    assert config.rest_api_port == 6000
+    assert config.feed_job_prefixes == ("MIX1:", "MIX2:", "MIX3:")
+    assert config.import_max_nr_hours == 24
+
+
+def test_binder_specialization() -> None:
+    """The deprecated `Binder[DT]` syntax is still supported."""
+    with stream_text(
+        """
+        rest-api-port = 6000
+        feed-job-prefixes = ["MIX1:", "MIX2:", "MIX3:"]
+        """
+    ) as stream:
+        config = Binder[Config].parse_toml(stream)
 
     assert config.rest_api_port == 6000
     assert config.feed_job_prefixes == ("MIX1:", "MIX2:", "MIX3:")

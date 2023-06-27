@@ -7,7 +7,7 @@ import operator
 import re
 import sys
 from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
-from dataclasses import MISSING, Field, fields, is_dataclass, replace
+from dataclasses import MISSING, Field, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import reduce
 from importlib import import_module
@@ -15,7 +15,7 @@ from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
 from pathlib import Path
 from textwrap import dedent
 from types import MappingProxyType, ModuleType, NoneType, UnionType
-from typing import TYPE_CHECKING, Any, BinaryIO, Generic, TypeVar, Union, cast, get_args, get_origin, overload
+from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin, overload
 from weakref import WeakKeyDictionary
 
 if sys.version_info < (3, 11):
@@ -186,34 +186,29 @@ _TIMEDELTA_SUFFIXES = {"days", "seconds", "microseconds", "milliseconds", "minut
 T = TypeVar("T")
 
 
-class _BinderCache(type, Generic[T]):
-    """
-    Cache that returns a dedicated `Binder` instance for each dataclass.
-    """
+@dataclass
+class _ClassInfo(Generic[T]):
 
-    _cache: MutableMapping[type[T], Binder[T]] = WeakKeyDictionary()
+    _cache: ClassVar[MutableMapping[type[Any], _ClassInfo[Any]]] = WeakKeyDictionary()
 
-    def __call__(cls, class_or_instance: type[T] | T) -> Binder[T]:
-        if isinstance(class_or_instance, type):
-            instance = None
-            dataclass = class_or_instance
-        else:
-            instance = class_or_instance
-            dataclass = instance.__class__
+    field_types: Mapping[str, type | Binder[Any]]
 
+    @classmethod
+    def get(cls, dataclass: type[T]) -> _ClassInfo[T]:
         try:
-            binder = cls._cache[dataclass]
+            return cls._cache[dataclass]
         except KeyError:
-            binder = super().__call__(dataclass, None)
-            cls._cache[dataclass] = binder
+            info = cls(
+                {
+                    field_name: _collect_type(field_type, f"{dataclass.__name__}.{field_name}")
+                    for field_name, field_type in _get_fields(dataclass)
+                }
+            )
+            cls._cache[dataclass] = info
+            return info
 
-        if instance is None:
-            return binder
-        else:
-            return binder._replace_instance(instance)
 
-
-class Binder(Generic[T], metaclass=_BinderCache):
+class Binder(Generic[T]):
     """
     Binds TOML data to a specific dataclass.
     """
@@ -227,33 +222,22 @@ class Binder(Generic[T], metaclass=_BinderCache):
         """Deprecated: use `Binder(MyDataClass)` instead."""
         return cls(dataclass)
 
-    if TYPE_CHECKING:
+    @overload
+    def __init__(self, class_or_instance: type[T]) -> None:
+        ...
 
-        @overload
-        def __init__(self, class_or_instance: type[T]) -> None:
-            ...
+    @overload
+    def __init__(self, class_or_instance: T) -> None:
+        ...
 
-        @overload
-        def __init__(self, class_or_instance: T) -> None:
-            ...
-
-        def __init__(self, class_or_instance: type[T] | T) -> None:
-            ...
-
-    else:
-
-        def __init__(self, dataclass: type[T], instance: T | None) -> None:
-            self._dataclass = dataclass
-            self._instance = instance
-            self._field_types = {
-                field_name: _collect_type(field_type, f"{dataclass.__name__}.{field_name}")
-                for field_name, field_type in _get_fields(dataclass)
-            }
-
-    def _replace_instance(self, instance: T) -> Binder[T]:
-        binder = self.__class__.__new__(self.__class__)
-        binder.__init__(self._dataclass, instance)  # type: ignore[misc]
-        return binder
+    def __init__(self, class_or_instance: type[T] | T) -> None:
+        if isinstance(class_or_instance, type):
+            self._dataclass = dataclass = class_or_instance
+            self._instance = None
+        else:
+            self._dataclass = dataclass = class_or_instance.__class__
+            self._instance = class_or_instance
+        self._field_types = _ClassInfo.get(dataclass).field_types
 
     def _bind_to_single_type(self, value: object, field_type: type, context: str) -> object:
         """
