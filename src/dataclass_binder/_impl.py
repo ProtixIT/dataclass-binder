@@ -164,11 +164,11 @@ def _get_fields(cls: type) -> Iterator[tuple[str, type]]:
 
     fields_by_name = {field.name: field for field in fields(cls)}
 
-    # Note: getmodule() can return None, but the end result is still fine.
-    cls_globals = getattr(getmodule(cls), "__dict__", {})
-    cls_locals = vars(cls)
-
     for field_container in reversed(cls.__mro__):
+        # Note: getmodule() can return None, but the end result is still fine.
+        cls_globals = getattr(getmodule(field_container), "__dict__", {})
+        cls_locals = vars(field_container)
+
         for name, annotation in get_annotations(field_container).items():
             field = fields_by_name[name]
             if not field.init:

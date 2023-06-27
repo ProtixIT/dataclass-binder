@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TypeAlias
+
+URL: TypeAlias = str
 
 
 @dataclass(frozen=True)
 class Config:
     """Configuration for an example service."""
 
-    database_url: str
+    database_url: URL
     """The URL of the database to connect to."""
 
     port: int = 12345

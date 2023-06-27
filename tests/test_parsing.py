@@ -133,21 +133,21 @@ def test_bind_inheritance() -> None:
     """A dataclass inheriting from another dataclass accepts fields from both the base and the subclass."""
 
     @dataclass(frozen=True)
-    class ExtendedConfig(Config):
+    class ExtendedConfig(example.Config):
+        """Inheriting from a class in another module complicates the annotation evaluation."""
+
         dry_run: bool = False
 
     with stream_text(
         """
-        rest-api-port = 6000
-        feed-job-prefixes = ["MIX1:", "MIX2:", "MIX3:"]
+        database-url = "postgresql://smaug:gold@mountain/hoard"
         dry-run = true
         """
     ) as stream:
         config = Binder(ExtendedConfig).parse_toml(stream)
 
-    assert config.rest_api_port == 6000
-    assert config.feed_job_prefixes == ("MIX1:", "MIX2:", "MIX3:")
-    assert config.import_max_nr_hours == 24
+    assert config.database_url == "postgresql://smaug:gold@mountain/hoard"
+    assert config.port == 12345
     assert config.dry_run is True
 
 
