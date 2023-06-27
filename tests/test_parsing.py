@@ -1000,3 +1000,51 @@ def test_bind_excluded_from_init() -> None:
         pytest.raises(ValueError, match=r"^Field 'SumConfig\.total' does not exist$"),
     ):
         Binder(SumConfig).parse_toml(stream)
+
+
+@dataclass
+class Nested:
+    value: str
+
+
+@dataclass(kw_only=True)
+class TopLevel:
+    priority: int
+    flag: bool = False
+    nested1: Nested
+    nested2: Nested
+
+
+def test_bind_merge() -> None:
+    """
+    A binder constructed from a dataclass instance uses that instance as defaults,
+    for the top level and any nested dataclasses (unless they are part of collections).
+    """
+
+    with stream_text(
+        """
+        priority = 99
+
+        [nested1]
+        value = "sun"
+
+        [nested2]
+        value = "moon"
+        """
+    ) as stream:
+        system_config = Binder(TopLevel).parse_toml(stream)
+
+    with stream_text(
+        """
+        flag = true
+
+        [nested2]
+        value = "cheese"
+        """
+    ) as stream:
+        merged_config = Binder(system_config).parse_toml(stream)
+
+    assert merged_config.priority == 99
+    assert merged_config.flag is True
+    assert merged_config.nested1.value == "sun"
+    assert merged_config.nested2.value == "cheese"

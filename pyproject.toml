@@ -54,6 +54,7 @@ ignore = [
     "RET505", "RET506",  # not sure following that style improves readability
     "PLW2901",  # overwriting the loop variable is sometimes useful
     "TRY003",  # maybe in the future
+    "TRY301",  # alternatives might be worse
 ]
 
 [tool.mypy]
