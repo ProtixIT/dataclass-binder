@@ -255,16 +255,12 @@ class Binder(Generic[T], metaclass=_BinderCache):
         binder.__init__(self._dataclass, instance)  # type: ignore[misc]
         return binder
 
-    def _bind_to_single_type(self, value: object, field_type: type | Binder[Any], context: str) -> object:
+    def _bind_to_single_type(self, value: object, field_type: type, context: str) -> object:
         """
         Convert a TOML value to a singular (non-union) field type.
 
         Raises TypeError if the TOML value's type doesn't match the field type.
         """
-        if isinstance(field_type, Binder):
-            if not isinstance(value, dict):
-                raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
-            return field_type._bind_to_class(value, context)
         origin = get_origin(field_type)
         if origin is None:
             if field_type is ModuleType:
@@ -344,19 +340,23 @@ class Binder(Generic[T], metaclass=_BinderCache):
 
         Raises TypeError if the TOML value's type doesn't match the field type.
         """
-        if get_origin(field_type) is UnionType:
-            for arg in get_args(field_type):
-                try:
-                    return self._bind_to_single_type(value, arg, context)
-                except TypeError:
-                    # TODO: This is inefficient: we format and then discard the error string.
-                    #       Union types are not used a lot though, so it's fine for now.
-                    # TODO: When the union contains multiple custom classes, we pick the first that succeeds.
-                    #       It would be cleaner to limit custom classes to one at collection time.
-                    pass
-            raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected '{field_type}'")
-        else:
-            return self._bind_to_single_type(value, field_type, context)
+        target_types = get_args(field_type) if get_origin(field_type) is UnionType else (field_type,)
+        for target_type in target_types:
+            try:
+                if isinstance(field_type, Binder):
+                    if not isinstance(value, dict):
+                        raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
+                    return field_type._bind_to_class(value, context)
+                else:
+                    return self._bind_to_single_type(value, target_type, context)
+            except TypeError:
+                if len(target_types) == 1:
+                    raise
+                # TODO: This is inefficient: we format and then discard the error string.
+                #       Union types are not used a lot though, so it's fine for now.
+                # TODO: When the union contains multiple custom classes, we pick the first that succeeds.
+                #       It would be cleaner to limit custom classes to one at collection time.
+        raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected '{field_type}'")
 
     def _bind_to_class(self, toml_dict: Mapping[str, Any], context: str) -> T:
         field_types = self._field_types
