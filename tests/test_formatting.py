@@ -369,12 +369,23 @@ source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/
 # Default:
 # destination-database-connection-url = 'sqlite://'
 
-# Mandatory.
-nested = {inner-int = 5, inner-str = 'foo', with-default = 'n/a'}
-
 # Default:
 # webhook-urls = []
 webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
+
+[nested]
+
+# Mandatory.
+inner-int = 5
+
+# Mandatory.
+inner-str = 'foo'
+
+# Optional.
+# optional = '???'
+
+# Default:
+# with-default = 'n/a'
 """.strip()
     )
 

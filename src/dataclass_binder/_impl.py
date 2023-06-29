@@ -406,49 +406,69 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
-        dataclass = self._dataclass
-        instance = self._instance
-        docstrings = self._class_info.field_docstrings
+        queue = [(self, self._instance, "")]
 
         first = True
-        for field in fields(dataclass):  # type: ignore[arg-type]
-            if not field.init:
-                continue
+        while queue:
+            binder, instance, context = queue.pop(0)
+            dataclass = binder._dataclass
+            field_types = binder._class_info.field_types
+            docstrings = binder._class_info.field_docstrings
 
-            if first:
-                first = False
-            else:
+            if not first:
                 yield ""
 
-            docstring = docstrings.get(field.name)
-            lines = docstring.split("\n") if docstring else []
-            # End with an empty line if the docstring contains multiple paragraphs.
-            if "" in lines:
-                lines.append("")
+            # TODO: What if none of the fields are formatted?
+            if context:
+                yield f"[{context}]"
+                first = False
 
-            for line in lines:
-                yield f"# {line}".rstrip()
+            for field in fields(dataclass):  # type: ignore[arg-type]
+                if not field.init:
+                    continue
 
-            key = field.name.replace("_", "-")
-            value = None if instance is None else getattr(instance, field.name)
-            default = field.default
-            if value == default:
-                value = None
-            if default is MISSING or default is None:
-                if default is None:
-                    yield "# Optional."
-                else:
-                    yield "# Mandatory."
-                if value is None:
-                    comment = "# " if default is None else ""
+                key = field.name.replace("_", "-")
+                value = None if instance is None else getattr(instance, field.name)
+
+                field_type = field_types[field.name]
+                if isinstance(field_type, Binder):
+                    # Most Python names are valid as bare keys, but only if they're ASCII-only.
                     key_fmt = "".join(_iter_format_key(key))
-                    value_fmt = _format_value_for_type(self._class_info.field_types[field.name])
-                    yield f"{comment}{key_fmt} = {value_fmt}"
-            else:
-                yield "# Default:"
-                yield f"# {format_toml_pair(key, default)}"
-            if value is not None:
-                yield f"{format_toml_pair(key, value)}"
+                    queue.append((field_type, value, f"{context}.{key_fmt}" if context else key_fmt))
+                    continue
+
+                if first:
+                    first = False
+                else:
+                    yield ""
+
+                docstring = docstrings.get(field.name)
+                lines = docstring.split("\n") if docstring else []
+                # End with an empty line if the docstring contains multiple paragraphs.
+                if "" in lines:
+                    lines.append("")
+
+                for line in lines:
+                    yield f"# {line}".rstrip()
+
+                default = field.default
+                if value == default:
+                    value = None
+                if default is MISSING or default is None:
+                    if default is None:
+                        yield "# Optional."
+                    else:
+                        yield "# Mandatory."
+                    if value is None:
+                        comment = "# " if default is None else ""
+                        key_fmt = "".join(_iter_format_key(key))
+                        value_fmt = _format_value_for_type(field_type)
+                        yield f"{comment}{key_fmt} = {value_fmt}"
+                else:
+                    yield "# Default:"
+                    yield f"# {format_toml_pair(key, default)}"
+                if value is not None:
+                    yield f"{format_toml_pair(key, value)}"
 
     def _format_inline(self) -> Iterable[str]:
         yield "{"
