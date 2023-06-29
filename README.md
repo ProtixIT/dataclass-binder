@@ -409,10 +409,10 @@ class Config:
 You can generate a template configuration file using:
 
 ```py
-from dataclass_binder import format_template
+from dataclass_binder import Binder
 
 
-for line in format_template(Config):
+for line in Binder(Config).format_toml_template():
     print(line)
 ```
 
@@ -428,7 +428,7 @@ database-url = '???'
 # port = 12345
 ```
 
-It is also possible to provide placeholder values by passing a dataclass instance rather than the dataclass itself to `format_template()`:
+It is also possible to provide placeholder values by passing a dataclass instance rather than the dataclass itself to `format_toml_template()`:
 
 ```py
 TEMPLATE = Config(
@@ -436,7 +436,7 @@ TEMPLATE = Config(
     port=8080,
 )
 
-for line in format_template(TEMPLATE):
+for line in Binder(TEMPLATE).format_toml_template():
     print(line)
 ```
 
@@ -490,6 +490,10 @@ After you first set up your virtual environment with Poetry, run this command to
 ### Binder Specialization
 
 Prior to version 0.2.0, the `Binder` class was specialized using a type argument (`Binder[Config]`) rather than instantiation (`Binder(config)`). The old syntax is still supported for now, but the backwards compatibility might be removed in a minor release prior to 1.0 if it becomes a maintenance burden, so please update your code.
+
+### Template Formatting
+
+In version 0.3.0, the function `format_template()` has been replaced by the method `Binder.format_toml_template()`. The old function is still available for now.
 
 ## Changelog
 
