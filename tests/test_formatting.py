@@ -63,7 +63,7 @@ def round_trip(obj: T) -> T:
     Convert data in a dataclass to TOML and back.
     """
 
-    toml = "\n".join(format_template(obj))
+    toml = "\n".join(Binder(obj).format_toml_template())
     print(f"TOML <- {obj!r}")  # noqa: T201
     print(toml)  # noqa: T201
     return parse_toml(type(obj), toml)
@@ -278,7 +278,7 @@ class TemplateConfig:
 
 def test_format_template_full() -> None:
     """The template generated for the TemplateConfig class matches our golden output."""
-    template = "\n".join(format_template(TemplateConfig))
+    template = "\n".join(Binder(TemplateConfig).format_toml_template())
     assert template == (
         """
 # Field without default.
@@ -313,6 +313,13 @@ multi-type = '???' | 0
     )
 
 
+def test_format_template_old() -> None:
+    """The deprecated `format_template()` function  is still supported."""
+    template_old = "\n".join(format_template(TemplateConfig))
+    template_new = "\n".join(Binder(TemplateConfig).format_toml_template())
+    assert template_old == template_new
+
+
 @dataclass
 class NestedConfig:
     inner_int: int
@@ -333,7 +340,7 @@ def test_format_template_valid_value(*, field_type: type[Any], optional: bool, s
     Not all templates values are valid TOML, but the selected parameters are.
     """
     dc = single_value_dataclass(field_type, optional=optional, string=string)
-    toml = "\n".join(format_template(dc))
+    toml = "\n".join(Binder(dc).format_toml_template())
     print(field_type, "->", toml)  # noqa: T201
     parse_toml(dc, toml)
 
@@ -353,7 +360,7 @@ def test_format_template_populated() -> None:
         nested=NestedConfig(5, "foo"),
         webhook_urls=("https://host1/refresh", "https://host2/refresh"),
     )
-    template = "\n".join(format_template(config))
+    template = "\n".join(Binder(config).format_toml_template())
     assert template == (
         """
 # Mandatory.
@@ -403,7 +410,7 @@ def test_format_template_no_module(sourceless_class: type[Any]) -> None:
     # This might not be necessary anymore if the standard library gets fixed.
     #   https://github.com/python/cpython/issues/98239
     sourceless_class.__module__ = "<no source>"
-    template = "\n".join(format_template(sourceless_class))
+    template = "\n".join(Binder(sourceless_class).format_toml_template())
     assert template == (
         """
 # Mandatory.
