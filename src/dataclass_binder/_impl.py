@@ -395,7 +395,7 @@ class Binder(Generic[T]):
         else:
             return replace(instance, **parsed)  # type: ignore[type-var]
 
-    def format_template(self) -> Iterator[str]:
+    def format_toml_template(self) -> Iterator[str]:
         """
         Yield lines of TOML text as a template for populating the dataclass or object that we are binding to.
 
@@ -678,8 +678,8 @@ def get_field_docstrings(dataclass: type[Any]) -> Mapping[str, str]:
 
 
 def format_template(class_or_instance: Any) -> Iterator[str]:
-    """Deprecated: use `Binder.format_template()` instead."""
-    yield from Binder(class_or_instance).format_template()
+    """Deprecated: use `Binder.format_toml_template()` instead."""
+    yield from Binder(class_or_instance).format_toml_template()
 
 
 def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:

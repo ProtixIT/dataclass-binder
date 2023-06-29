@@ -412,7 +412,7 @@ You can generate a template configuration file using:
 from dataclass_binder import Binder
 
 
-for line in Binder(Config).format_template():
+for line in Binder(Config).format_toml_template():
     print(line)
 ```
 
@@ -428,7 +428,7 @@ database-url = '???'
 # port = 12345
 ```
 
-It is also possible to provide placeholder values by passing a dataclass instance rather than the dataclass itself to `format_template()`:
+It is also possible to provide placeholder values by passing a dataclass instance rather than the dataclass itself to `format_toml_template()`:
 
 ```py
 TEMPLATE = Config(
@@ -436,7 +436,7 @@ TEMPLATE = Config(
     port=8080,
 )
 
-for line in Binder(TEMPLATE).format_template():
+for line in Binder(TEMPLATE).format_toml_template():
     print(line)
 ```
 
@@ -493,7 +493,7 @@ Prior to version 0.2.0, the `Binder` class was specialized using a type argument
 
 ### Template Formatting
 
-Prior to version 0.3.0, `format_template()` was a function rather than a method of `Binder`. The old function is still available.
+In version 0.3.0, the function `format_template()` has been replaced by the method `Binder.format_toml_template()`. The old function is still available for now.
 
 ## Changelog
 
