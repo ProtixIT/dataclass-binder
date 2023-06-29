@@ -6,7 +6,7 @@ import ast
 import operator
 import re
 import sys
-from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
 from dataclasses import MISSING, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import reduce
@@ -184,6 +184,7 @@ def _get_fields(cls: type) -> Iterator[tuple[str, type]]:
 _TIMEDELTA_SUFFIXES = {"days", "seconds", "microseconds", "milliseconds", "minutes", "hours", "weeks"}
 
 T = TypeVar("T")
+T2 = TypeVar("T2")
 
 
 @dataclass(slots=True)
@@ -406,69 +407,75 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
-        queue = [(self, self._instance, "")]
+        queue: list[tuple[Binder[Any], Any, str]] = [(self, self._instance, "")]
 
-        first = True
+        def defer(binder: Binder[T2], key: str, value: T2 | None) -> None:
+            # Most Python names are valid as bare keys, but only if they're ASCII-only.
+            key_fmt = "".join(_iter_format_key(key))
+            queue.append((binder, value, f"{context}.{key_fmt}" if context else key_fmt))
+
+        skip_empty = True
         while queue:
             binder, instance, context = queue.pop(0)
-            dataclass = binder._dataclass
-            field_types = binder._class_info.field_types
-            docstrings = binder._class_info.field_docstrings
-
-            if not first:
-                yield ""
 
             # TODO: What if none of the fields are formatted?
             if context:
+                yield ""
                 yield f"[{context}]"
-                first = False
 
-            for field in fields(dataclass):  # type: ignore[arg-type]
-                if not field.init:
-                    continue
+            for line in binder._format_toml_table(instance, defer):
+                if line or not skip_empty:
+                    yield line
+                    skip_empty = False
 
-                key = field.name.replace("_", "-")
-                value = None if instance is None else getattr(instance, field.name)
+    def _format_toml_table(
+        self, instance: T | None, defer: Callable[[Binder[T2], str, T2 | None], None]
+    ) -> Iterator[str]:
+        dataclass = self._dataclass
+        field_types = self._class_info.field_types
+        docstrings = self._class_info.field_docstrings
 
-                field_type = field_types[field.name]
-                if isinstance(field_type, Binder):
-                    # Most Python names are valid as bare keys, but only if they're ASCII-only.
+        for field in fields(dataclass):  # type: ignore[arg-type]
+            if not field.init:
+                continue
+
+            key = field.name.replace("_", "-")
+            value = None if instance is None else getattr(instance, field.name)
+
+            field_type = field_types[field.name]
+            if isinstance(field_type, Binder):
+                defer(field_type, key, value)
+                continue
+
+            yield ""
+
+            docstring = docstrings.get(field.name)
+            lines = docstring.split("\n") if docstring else []
+            # End with an empty line if the docstring contains multiple paragraphs.
+            if "" in lines:
+                lines.append("")
+
+            for line in lines:
+                yield f"# {line}".rstrip()
+
+            default = field.default
+            if value == default:
+                value = None
+            if default is MISSING or default is None:
+                if default is None:
+                    yield "# Optional."
+                else:
+                    yield "# Mandatory."
+                if value is None:
+                    comment = "# " if default is None else ""
                     key_fmt = "".join(_iter_format_key(key))
-                    queue.append((field_type, value, f"{context}.{key_fmt}" if context else key_fmt))
-                    continue
-
-                if first:
-                    first = False
-                else:
-                    yield ""
-
-                docstring = docstrings.get(field.name)
-                lines = docstring.split("\n") if docstring else []
-                # End with an empty line if the docstring contains multiple paragraphs.
-                if "" in lines:
-                    lines.append("")
-
-                for line in lines:
-                    yield f"# {line}".rstrip()
-
-                default = field.default
-                if value == default:
-                    value = None
-                if default is MISSING or default is None:
-                    if default is None:
-                        yield "# Optional."
-                    else:
-                        yield "# Mandatory."
-                    if value is None:
-                        comment = "# " if default is None else ""
-                        key_fmt = "".join(_iter_format_key(key))
-                        value_fmt = _format_value_for_type(field_type)
-                        yield f"{comment}{key_fmt} = {value_fmt}"
-                else:
-                    yield "# Default:"
-                    yield f"# {format_toml_pair(key, default)}"
-                if value is not None:
-                    yield f"{format_toml_pair(key, value)}"
+                    value_fmt = _format_value_for_type(field_type)
+                    yield f"{comment}{key_fmt} = {value_fmt}"
+            else:
+                yield "# Default:"
+                yield f"# {format_toml_pair(key, default)}"
+            if value is not None:
+                yield f"{format_toml_pair(key, value)}"
 
     def _format_inline(self) -> Iterable[str]:
         yield "{"
