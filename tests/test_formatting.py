@@ -345,11 +345,16 @@ def test_format_template_valid_value(*, field_type: type[Any], optional: bool, s
     parse_toml(dc, toml)
 
 
+@dataclass
+class MiddleConfig:
+    deepest: NestedConfig
+
+
 @dataclass(kw_only=True)
 class PopulatedConfig:
     source_database_connection_url: str
     destination_database_connection_url: str = "sqlite://"
-    nested: NestedConfig
+    middle: MiddleConfig
     webhook_urls: tuple[str, ...] = ()
 
 
@@ -357,7 +362,7 @@ def test_format_template_populated() -> None:
     config = PopulatedConfig(
         source_database_connection_url="postgresql://<username>:<password>@<hostname>/<database name>",
         destination_database_connection_url="sqlite://",
-        nested=NestedConfig(5, "foo"),
+        middle=MiddleConfig(NestedConfig(5, "foo")),
         webhook_urls=("https://host1/refresh", "https://host2/refresh"),
     )
     template = "\n".join(Binder(config).format_toml_template())
@@ -373,7 +378,7 @@ source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/
 # webhook-urls = []
 webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
 
-[nested]
+[middle.deepest]
 
 # Mandatory.
 inner-int = 5

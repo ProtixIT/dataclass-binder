@@ -417,14 +417,14 @@ class Binder(Generic[T]):
         skip_empty = True
         while queue:
             binder, instance, context = queue.pop(0)
-
-            # TODO: What if none of the fields are formatted?
-            if context:
-                yield ""
-                yield f"[{context}]"
+            output_header = bool(context)
 
             for line in binder._format_toml_table(instance, defer):
                 if line or not skip_empty:
+                    if output_header:
+                        yield ""
+                        yield f"[{context}]"
+                        output_header = False
                     yield line
                     skip_empty = False
 
