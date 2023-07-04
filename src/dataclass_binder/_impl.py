@@ -477,19 +477,6 @@ class Binder(Generic[T]):
             if value is not None:
                 yield f"{format_toml_pair(key, value)}"
 
-    def _format_inline(self) -> Iterable[str]:
-        yield "{"
-        first = True
-        for field_name, field_type in self._class_info.field_types.items():
-            if first:
-                first = False
-            else:
-                yield ", "
-            yield from _iter_format_key(field_name.replace("_", "-"))
-            yield " = "
-            yield _format_value_for_type(field_type)
-        yield "}"
-
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
 
@@ -709,7 +696,7 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
     yield from Binder(class_or_instance).format_toml_template()
 
 
-def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
+def _format_value_for_type(field_type: type[Any]) -> str:
     origin = get_origin(field_type)
     if origin is None:
         if field_type is str:
@@ -728,8 +715,6 @@ def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
             return "2020-01-01"
         elif field_type is time or field_type is timedelta:
             return "00:00:00"
-        elif isinstance(field_type, Binder):
-            return "".join(field_type._format_inline())
         else:
             # We have handled all the non-generic types supported by _collect_type().
             raise AssertionError(field_type)
