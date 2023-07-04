@@ -270,10 +270,15 @@ class TemplateConfig:
     ...consists of multiple paragraphs.
     """
 
+    expiry: timedelta
+
     multi_type: str | int
 
     derived: int = field(init=False)
     """Excluded field."""
+
+    def __post_init__(self) -> None:
+        self.derived = (2 if self.flag else 3) * self.number
 
 
 def test_format_template_full() -> None:
@@ -308,6 +313,9 @@ module = 'fully.qualified.module.name'
 # another-number = 0.5
 
 # Mandatory.
+expiry = 00:00:00
+
+# Mandatory.
 multi-type = '???' | 0
 """.strip()
     )
@@ -318,6 +326,25 @@ def test_format_template_old() -> None:
     template_old = "\n".join(format_template(TemplateConfig))
     template_new = "\n".join(Binder(TemplateConfig).format_toml_template())
     assert template_old == template_new
+
+
+@pytest.mark.parametrize("optional", (True, False))
+@pytest.mark.parametrize("string", (True, False))
+def test_format_dataclass_inline(*, optional: bool, string: bool) -> None:
+    """
+    A nested dataclass can be formatted as a TOML inline table.
+
+    We prefer to format dataclasses as full (non-inline) tables, but sometimes we must format them inline,
+    for example when they share an array with non-table values.
+    """
+    value = TemplateConfig(happiness="easy", flag=True, module=example, expiry=timedelta(days=3), multi_type=-1)
+    formatted = format_toml_pair("value", value)
+    assert formatted == (
+        "value = {happiness = 'easy', flag = true, module = 'tests.example', "
+        "number = 123, another-number = 0.5, expiry-days = 3, multi-type = -1}"
+    )
+    dc = single_value_dataclass(TemplateConfig, optional=optional, string=string)
+    assert parse_toml(dc, formatted).value == value
 
 
 @dataclass
