@@ -349,6 +349,8 @@ def test_format_dataclass_inline(*, optional: bool, string: bool) -> None:
 
 @dataclass
 class NestedConfig:
+    """This table is bound to a nested dataclass."""
+
     inner_int: int
     inner_str: str
     optional: str | None = None
@@ -374,6 +376,8 @@ def test_format_template_valid_value(*, field_type: type[Any], optional: bool, s
 
 @dataclass
 class MiddleConfig:
+    """This docstring will remain invisible, as its table is empty."""
+
     deepest: NestedConfig
 
 
@@ -405,6 +409,7 @@ source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/
 # webhook-urls = []
 webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
 
+# This table is bound to a nested dataclass.
 [middle.deepest]
 
 # Mandatory.

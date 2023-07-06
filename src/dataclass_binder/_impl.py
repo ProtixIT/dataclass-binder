@@ -212,6 +212,18 @@ class _ClassInfo(Generic[T]):
             return info
 
     @property
+    def class_docstring(self) -> str | None:
+        class_docstring = self.dataclass.__doc__
+        if class_docstring is None:
+            # No coverage because of the undocumented feature described below.
+            return None  # pragma: no cover
+        if class_docstring.startswith(f"{self.dataclass.__name__}("):
+            # As an undocumented feature, the dataclass implementation will auto-generate docstrings.
+            # Those only contain redundant information, so we don't want to use them.
+            return None
+        return cleandoc(class_docstring)
+
+    @property
     def field_docstrings(self) -> Mapping[str, str]:
         field_docstrings = self._field_docstrings
         if field_docstrings is None:
@@ -423,6 +435,10 @@ class Binder(Generic[T]):
                 if line or not skip_empty:
                     if output_header:
                         yield ""
+                        class_docstring = binder._class_info.class_docstring
+                        if class_docstring is not None:
+                            for doc_line in class_docstring.split("\n"):
+                                yield f"# {doc_line}".rstrip()
                         yield f"[{context}]"
                         output_header = False
                     yield line
