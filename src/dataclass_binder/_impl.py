@@ -435,10 +435,7 @@ class Binder(Generic[T]):
                 if line or not skip_empty:
                     if output_header:
                         yield ""
-                        class_docstring = binder._class_info.class_docstring
-                        if class_docstring is not None:
-                            for doc_line in class_docstring.split("\n"):
-                                yield f"# {doc_line}".rstrip()
+                        yield from _format_comments(binder._class_info.class_docstring)
                         yield f"[{context}]"
                         output_header = False
                     yield line
@@ -465,32 +462,23 @@ class Binder(Generic[T]):
 
             yield ""
 
-            docstring = docstrings.get(field.name)
-            lines = docstring.split("\n") if docstring else []
-            # End with an empty line if the docstring contains multiple paragraphs.
-            if "" in lines:
-                lines.append("")
-
-            for line in lines:
-                yield f"# {line}".rstrip()
-
+            comments = [docstrings.get(field.name)]
             default = field.default
             if value == default:
                 value = None
             if default is MISSING or default is None:
-                if default is None:
-                    yield "# Optional."
-                else:
-                    yield "# Mandatory."
-                if value is None:
+                comments.append("Optional." if default is None else "Mandatory.")
+            else:
+                comments.append(f"Default:\n{format_toml_pair(key, default)}")
+            yield from _format_comments(*comments)
+
+            if value is None:
+                if default is MISSING or default is None:
                     comment = "# " if default is None else ""
                     key_fmt = "".join(_iter_format_key(key))
                     value_fmt = _format_value_for_type(field_type)
                     yield f"{comment}{key_fmt} = {value_fmt}"
             else:
-                yield "# Default:"
-                yield f"# {format_toml_pair(key, default)}"
-            if value is not None:
                 yield f"{format_toml_pair(key, value)}"
 
     if TYPE_CHECKING:
@@ -670,6 +658,20 @@ def _iter_format_value(value: object) -> Iterator[str]:
             yield "]"
         case _:
             raise TypeError(type(value).__name__)
+
+
+def _format_comments(*comments: str | None) -> Iterator[str]:
+    separator = False
+    for comment in comments:
+        if comment:
+            contains_empty = False
+            for line in comment.split("\n"):
+                if separator:
+                    yield "#"
+                    separator = False
+                yield f"# {line}".rstrip()
+                contains_empty |= not line
+            separator = contains_empty
 
 
 def get_field_docstrings(dataclass: type[Any]) -> Mapping[str, str]:
