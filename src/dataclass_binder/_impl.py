@@ -419,16 +419,18 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
-        queue: list[tuple[Binder[Any], Any, str, bool]] = [(self, self._instance, "", False)]
+        queue: list[tuple[Binder[Any], Any, str, str | None, bool]] = [(self, self._instance, "", None, False)]
 
-        def defer(binder: Binder[T2], key: str, value: T2 | None, optional: bool) -> None:  # noqa: FBT001
+        def defer(
+            binder: Binder[T2], key: str, value: T2 | None, docstring: str | None, optional: bool  # noqa: FBT001
+        ) -> None:
             # Most Python names are valid as bare keys, but only if they're ASCII-only.
             key_fmt = "".join(_iter_format_key(key))
-            queue.append((binder, value, f"{context}.{key_fmt}" if context else key_fmt, optional))
+            queue.append((binder, value, f"{context}.{key_fmt}" if context else key_fmt, docstring, optional))
 
         skip_empty = True
         while queue:
-            binder, instance, context, optional = queue.pop(0)
+            binder, instance, context, docstring, optional = queue.pop(0)
             output_header = bool(context)
 
             for line in binder._format_toml_table(instance, defer):
@@ -438,6 +440,7 @@ class Binder(Generic[T]):
                             yield ""
                         yield from _format_comments(
                             binder._class_info.class_docstring,
+                            docstring,
                             "Optional table." if optional else None,
                         )
                         yield f"[{context}]"
@@ -448,7 +451,7 @@ class Binder(Generic[T]):
                     skip_empty = False
 
     def _format_toml_table(
-        self, instance: T | None, defer: Callable[[Binder[T2], str, T2 | None, bool], None]
+        self, instance: T | None, defer: Callable[[Binder[T2], str, T2 | None, str | None, bool], None]
     ) -> Iterator[str]:
         dataclass = self._dataclass
         field_types = self._class_info.field_types
@@ -460,15 +463,16 @@ class Binder(Generic[T]):
 
             key = field.name.replace("_", "-")
             value = None if instance is None else getattr(instance, field.name)
+            docstring = docstrings.get(field.name)
 
             field_type = field_types[field.name]
             if isinstance(field_type, Binder):
-                defer(field_type, key, value, field.default is not MISSING)
+                defer(field_type, key, value, docstring, field.default is not MISSING)
                 continue
 
             yield ""
 
-            comments = [docstrings.get(field.name)]
+            comments = [docstring]
             default = field.default
             if value == default:
                 value = None

@@ -361,11 +361,13 @@ def test_format_template_optional_nested() -> None:
     @dataclass
     class Config:
         nested: NestedConfig | None = None
+        """This is the docstring for the nested field."""
 
     template = "\n".join(Binder(Config).format_toml_template())
     assert template == (
         """
 # This table is bound to a nested dataclass.
+# This is the docstring for the nested field.
 # Optional table.
 [nested]
 
