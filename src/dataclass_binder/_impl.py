@@ -419,30 +419,36 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
-        queue: list[tuple[Binder[Any], Any, str]] = [(self, self._instance, "")]
+        queue: list[tuple[Binder[Any], Any, str, bool]] = [(self, self._instance, "", False)]
 
-        def defer(binder: Binder[T2], key: str, value: T2 | None) -> None:
+        def defer(binder: Binder[T2], key: str, value: T2 | None, optional: bool) -> None:  # noqa: FBT001
             # Most Python names are valid as bare keys, but only if they're ASCII-only.
             key_fmt = "".join(_iter_format_key(key))
-            queue.append((binder, value, f"{context}.{key_fmt}" if context else key_fmt))
+            queue.append((binder, value, f"{context}.{key_fmt}" if context else key_fmt, optional))
 
         skip_empty = True
         while queue:
-            binder, instance, context = queue.pop(0)
+            binder, instance, context, optional = queue.pop(0)
             output_header = bool(context)
 
             for line in binder._format_toml_table(instance, defer):
                 if line or not skip_empty:
                     if output_header:
-                        yield ""
-                        yield from _format_comments(binder._class_info.class_docstring)
+                        if not skip_empty:
+                            yield ""
+                        yield from _format_comments(
+                            binder._class_info.class_docstring,
+                            "Optional table." if optional else None,
+                        )
                         yield f"[{context}]"
+                        if line:
+                            yield ""
                         output_header = False
                     yield line
                     skip_empty = False
 
     def _format_toml_table(
-        self, instance: T | None, defer: Callable[[Binder[T2], str, T2 | None], None]
+        self, instance: T | None, defer: Callable[[Binder[T2], str, T2 | None, bool], None]
     ) -> Iterator[str]:
         dataclass = self._dataclass
         field_types = self._class_info.field_types
@@ -457,7 +463,7 @@ class Binder(Generic[T]):
 
             field_type = field_types[field.name]
             if isinstance(field_type, Binder):
-                defer(field_type, key, value)
+                defer(field_type, key, value, field.default is not MISSING)
                 continue
 
             yield ""

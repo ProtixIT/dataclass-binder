@@ -357,6 +357,33 @@ class NestedConfig:
     with_default: str = "n/a"
 
 
+def test_format_template_optional_nested() -> None:
+    @dataclass
+    class Config:
+        nested: NestedConfig | None = None
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == (
+        """
+# This table is bound to a nested dataclass.
+# Optional table.
+[nested]
+
+# Mandatory.
+inner-int = 0
+
+# Mandatory.
+inner-str = '???'
+
+# Optional.
+# optional = '???'
+
+# Default:
+# with-default = 'n/a'
+""".strip()
+    )
+
+
 @pytest.mark.parametrize(
     "field_type", (str, int, float, datetime, date, time, timedelta, list[str], dict[str, int], NestedConfig)
 )
