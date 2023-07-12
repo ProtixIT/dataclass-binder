@@ -7,7 +7,7 @@ import operator
 import re
 import sys
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
-from dataclasses import MISSING, dataclass, fields, is_dataclass, replace
+from dataclasses import MISSING, asdict, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import reduce
 from importlib import import_module
@@ -472,10 +472,15 @@ class Binder(Generic[T]):
                         continue
                 elif issubclass(origin, Sequence):
                     (value_type,) = get_args(field_type)
-                    if isinstance(value_type, Binder):
+                    binder = value_type if isinstance(value_type, Binder) else None
+                    if binder is not None or (
+                        value_type is object  # Any
+                        and (value is None or all(isinstance(item, Mapping) or is_dataclass(item) for item in value))
+                    ):
                         nested_key_fmt = f"[{key_fmt}]"
+                        optional = field.default is not MISSING
                         for nested_value in [None] if value is None else value:
-                            defer(Table(value_type, nested_key_fmt, nested_value, docstring))
+                            defer(Table(binder, nested_key_fmt, nested_value, docstring, optional))
                         continue
 
             yield ""
@@ -548,6 +553,8 @@ class Table(Generic[T]):
             match self.value:
                 case Mapping() as mapping:
                     content = [format_toml_pair(k, v) for k, v in mapping.items()]
+                case dc if is_dataclass(dc):
+                    content = [format_toml_pair(k, v) for k, v in asdict(dc).items()]  # type: ignore[arg-type]
                 case _:
                     content = []
         else:
