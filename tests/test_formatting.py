@@ -423,6 +423,38 @@ def test_format_template_mapping_nested_value() -> None:
     )
 
 
+def test_format_template_sequence_nested_class() -> None:
+    @dataclass
+    class Config:
+        nested: list[NestedConfig]
+        """This is the docstring for the nested field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == _expected_formatting_of_nested_dataclass("[nested]")
+
+
+def test_format_template_sequence_nested_value() -> None:
+    @dataclass
+    class Config:
+        nested: list[NestedConfig]
+        """This is the docstring for the nested field."""
+
+    config = Config(
+        nested=[
+            NestedConfig(inner_int=1, inner_str="one"),
+            NestedConfig(inner_int=2, inner_str="two"),
+        ]
+    )
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == "\n".join(
+        (
+            _expected_formatting_of_nested_dataclass("[nested]", inner_int=1, inner_str="one"),
+            "",
+            _expected_formatting_of_nested_dataclass("[nested]", inner_int=2, inner_str="two"),
+        )
+    )
+
+
 @pytest.mark.parametrize(
     "field_type", (str, int, float, datetime, date, time, timedelta, list[str], dict[str, int], NestedConfig)
 )

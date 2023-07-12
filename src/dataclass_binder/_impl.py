@@ -470,19 +470,27 @@ class Binder(Generic[T]):
                 defer(field_type, key_fmt, value, docstring, field.default is not MISSING)
                 continue
             origin = get_origin(field_type)
-            if origin is not None and issubclass(origin, Mapping):
-                key_type, value_type = get_args(field_type)
-                if isinstance(value_type, Binder):
-                    if value is None:
-                        nested_map = {f"{key_fmt}.<name>": None}
-                    else:
-                        nested_map = {
-                            f"{key_fmt}.{''.join(_iter_format_key(nested_key))}": nested_value
-                            for nested_key, nested_value in value.items()
-                        }
-                    for nested_key_fmt, nested_value in nested_map.items():
-                        defer(value_type, nested_key_fmt, nested_value, docstring, False)  # noqa: FBT003
-                    continue
+            if origin is not None:
+                if issubclass(origin, Mapping):
+                    key_type, value_type = get_args(field_type)
+                    if isinstance(value_type, Binder):
+                        if value is None:
+                            nested_map = {f"{key_fmt}.<name>": None}
+                        else:
+                            nested_map = {
+                                f"{key_fmt}.{''.join(_iter_format_key(nested_key))}": nested_value
+                                for nested_key, nested_value in value.items()
+                            }
+                        for nested_key_fmt, nested_value in nested_map.items():
+                            defer(value_type, nested_key_fmt, nested_value, docstring, False)  # noqa: FBT003
+                        continue
+                elif issubclass(origin, Sequence):
+                    (value_type,) = get_args(field_type)
+                    if isinstance(value_type, Binder):
+                        nested_key_fmt = f"[{key_fmt}]"
+                        for nested_value in [None] if value is None else value:
+                            defer(value_type, nested_key_fmt, nested_value, docstring, False)  # noqa: FBT003
+                        continue
 
             yield ""
 
