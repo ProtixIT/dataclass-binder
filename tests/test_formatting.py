@@ -270,10 +270,15 @@ class TemplateConfig:
     ...consists of multiple paragraphs.
     """
 
+    expiry: timedelta
+
     multi_type: str | int
 
     derived: int = field(init=False)
     """Excluded field."""
+
+    def __post_init__(self) -> None:
+        self.derived = (2 if self.flag else 3) * self.number
 
 
 def test_format_template_full() -> None:
@@ -308,6 +313,9 @@ module = 'fully.qualified.module.name'
 # another-number = 0.5
 
 # Mandatory.
+expiry = 00:00:00
+
+# Mandatory.
 multi-type = '???' | 0
 """.strip()
     )
@@ -320,12 +328,131 @@ def test_format_template_old() -> None:
     assert template_old == template_new
 
 
+@pytest.mark.parametrize("optional", (True, False))
+@pytest.mark.parametrize("string", (True, False))
+def test_format_dataclass_inline(*, optional: bool, string: bool) -> None:
+    """
+    A nested dataclass can be formatted as a TOML inline table.
+
+    We prefer to format dataclasses as full (non-inline) tables, but sometimes we must format them inline,
+    for example when they share an array with non-table values.
+    """
+    value = TemplateConfig(happiness="easy", flag=True, module=example, expiry=timedelta(days=3), multi_type=-1)
+    formatted = format_toml_pair("value", value)
+    assert formatted == (
+        "value = {happiness = 'easy', flag = true, module = 'tests.example', "
+        "number = 123, another-number = 0.5, expiry-days = 3, multi-type = -1}"
+    )
+    dc = single_value_dataclass(TemplateConfig, optional=optional, string=string)
+    assert parse_toml(dc, formatted).value == value
+
+
 @dataclass
 class NestedConfig:
+    """This table is bound to a nested dataclass."""
+
     inner_int: int
     inner_str: str
     optional: str | None = None
     with_default: str = "n/a"
+
+
+def _expected_formatting_of_nested_dataclass(
+    name: str, *, inner_int: int = 0, inner_str: str = "???", optional_table: bool = False
+) -> str:
+    optional_table_str = "# Optional table.\n" if optional_table else ""
+    return f"""
+# This table is bound to a nested dataclass.
+# This is the docstring for the nested field.
+{optional_table_str}\
+[{name}]
+
+# Mandatory.
+inner-int = {inner_int}
+
+# Mandatory.
+inner-str = '{inner_str}'
+
+# Optional.
+# optional = '???'
+
+# Default:
+# with-default = 'n/a'
+""".strip()
+
+
+def test_format_template_optional_nested() -> None:
+    @dataclass
+    class Config:
+        nested: NestedConfig | None = None
+        """This is the docstring for the nested field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == _expected_formatting_of_nested_dataclass("nested", optional_table=True)
+
+
+def test_format_template_mapping_nested_class() -> None:
+    @dataclass
+    class Config:
+        nested: dict[str, NestedConfig]
+        """This is the docstring for the nested field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == _expected_formatting_of_nested_dataclass("nested.<name>")
+
+
+def test_format_template_mapping_nested_value() -> None:
+    @dataclass
+    class Config:
+        nested: dict[str, NestedConfig]
+        """This is the docstring for the nested field."""
+
+    config = Config(
+        nested={
+            "first": NestedConfig(inner_int=1, inner_str="one"),
+            "second": NestedConfig(inner_int=2, inner_str="two"),
+        }
+    )
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == "\n".join(
+        (
+            _expected_formatting_of_nested_dataclass("nested.first", inner_int=1, inner_str="one"),
+            "",
+            _expected_formatting_of_nested_dataclass("nested.second", inner_int=2, inner_str="two"),
+        )
+    )
+
+
+def test_format_template_sequence_nested_class() -> None:
+    @dataclass
+    class Config:
+        nested: list[NestedConfig]
+        """This is the docstring for the nested field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == _expected_formatting_of_nested_dataclass("[nested]")
+
+
+def test_format_template_sequence_nested_value() -> None:
+    @dataclass
+    class Config:
+        nested: list[NestedConfig]
+        """This is the docstring for the nested field."""
+
+    config = Config(
+        nested=[
+            NestedConfig(inner_int=1, inner_str="one"),
+            NestedConfig(inner_int=2, inner_str="two"),
+        ]
+    )
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == "\n".join(
+        (
+            _expected_formatting_of_nested_dataclass("[nested]", inner_int=1, inner_str="one"),
+            "",
+            _expected_formatting_of_nested_dataclass("[nested]", inner_int=2, inner_str="two"),
+        )
+    )
 
 
 @pytest.mark.parametrize(
@@ -345,11 +472,18 @@ def test_format_template_valid_value(*, field_type: type[Any], optional: bool, s
     parse_toml(dc, toml)
 
 
+@dataclass
+class MiddleConfig:
+    """This docstring will remain invisible, as its table is empty."""
+
+    deepest: NestedConfig
+
+
 @dataclass(kw_only=True)
 class PopulatedConfig:
     source_database_connection_url: str
     destination_database_connection_url: str = "sqlite://"
-    nested: NestedConfig
+    middle: MiddleConfig
     webhook_urls: tuple[str, ...] = ()
 
 
@@ -357,7 +491,7 @@ def test_format_template_populated() -> None:
     config = PopulatedConfig(
         source_database_connection_url="postgresql://<username>:<password>@<hostname>/<database name>",
         destination_database_connection_url="sqlite://",
-        nested=NestedConfig(5, "foo"),
+        middle=MiddleConfig(NestedConfig(5, "foo")),
         webhook_urls=("https://host1/refresh", "https://host2/refresh"),
     )
     template = "\n".join(Binder(config).format_toml_template())
@@ -369,12 +503,24 @@ source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/
 # Default:
 # destination-database-connection-url = 'sqlite://'
 
-# Mandatory.
-nested = {inner-int = 5, inner-str = 'foo', with-default = 'n/a'}
-
 # Default:
 # webhook-urls = []
 webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
+
+# This table is bound to a nested dataclass.
+[middle.deepest]
+
+# Mandatory.
+inner-int = 5
+
+# Mandatory.
+inner-str = 'foo'
+
+# Optional.
+# optional = '???'
+
+# Default:
+# with-default = 'n/a'
 """.strip()
     )
 

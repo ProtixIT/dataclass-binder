@@ -6,7 +6,7 @@ import ast
 import operator
 import re
 import sys
-from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
 from dataclasses import MISSING, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import reduce
@@ -211,6 +211,18 @@ class _ClassInfo(Generic[T]):
             return info
 
     @property
+    def class_docstring(self) -> str | None:
+        class_docstring = self.dataclass.__doc__
+        if class_docstring is None:
+            # No coverage because of the undocumented feature described below.
+            return None  # pragma: no cover
+        if class_docstring.startswith(f"{self.dataclass.__name__}("):
+            # As an undocumented feature, the dataclass implementation will auto-generate docstrings.
+            # Those only contain redundant information, so we don't want to use them.
+            return None
+        return cleandoc(class_docstring)
+
+    @property
     def field_docstrings(self) -> Mapping[str, str]:
         field_docstrings = self._field_docstrings
         if field_docstrings is None:
@@ -406,62 +418,96 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
+        queue: list[Table[Any]] = [Table(self, "", self._instance, None)]
+
+        def defer(table: Table[Any]) -> None:
+            queue.append(table.prefix_context(context))
+
+        skip_empty = True
+        while queue:
+            table = queue.pop(0)
+            context = table.key_fmt
+            output_header = bool(context)
+
+            for line in table.binder._format_toml_table(table.value, defer):
+                if line or not skip_empty:
+                    if output_header:
+                        if not skip_empty:
+                            yield ""
+                        yield from _format_comments(
+                            table.binder._class_info.class_docstring,
+                            table.docstring,
+                            "Optional table." if table.optional else None,
+                        )
+                        yield f"[{context}]"
+                        if line:
+                            yield ""
+                        output_header = False
+                    yield line
+                    skip_empty = False
+
+    def _format_toml_table(self, instance: T | None, defer: Callable[[Table[Any]], None]) -> Iterator[str]:
         dataclass = self._dataclass
-        instance = self._instance
+        field_types = self._class_info.field_types
         docstrings = self._class_info.field_docstrings
 
-        first = True
         for field in fields(dataclass):  # type: ignore[arg-type]
             if not field.init:
                 continue
 
-            if first:
-                first = False
-            else:
-                yield ""
-
-            docstring = docstrings.get(field.name)
-            lines = docstring.split("\n") if docstring else []
-            # End with an empty line if the docstring contains multiple paragraphs.
-            if "" in lines:
-                lines.append("")
-
-            for line in lines:
-                yield f"# {line}".rstrip()
-
             key = field.name.replace("_", "-")
+            # Most Python names are valid as bare keys, but not if they contain non-ASCII characters.
+            key_fmt = "".join(_iter_format_key(key))
             value = None if instance is None else getattr(instance, field.name)
+            docstring = docstrings.get(field.name)
+
+            field_type = field_types[field.name]
+            if isinstance(field_type, Binder):
+                defer(Table(field_type, key_fmt, value, docstring, field.default is not MISSING))
+                continue
+            origin = get_origin(field_type)
+            if origin is not None:
+                if issubclass(origin, Mapping):
+                    key_type, value_type = get_args(field_type)
+                    if isinstance(value_type, Binder):
+                        if value is None:
+                            nested_map = {f"{key_fmt}.<name>": None}
+                        else:
+                            nested_map = {
+                                f"{key_fmt}.{''.join(_iter_format_key(nested_key))}": nested_value
+                                for nested_key, nested_value in value.items()
+                            }
+                        for nested_key_fmt, nested_value in nested_map.items():
+                            defer(Table(value_type, nested_key_fmt, nested_value, docstring))
+                        continue
+                elif issubclass(origin, Sequence):
+                    (value_type,) = get_args(field_type)
+                    if isinstance(value_type, Binder):
+                        nested_key_fmt = f"[{key_fmt}]"
+                        for nested_value in [None] if value is None else value:
+                            defer(Table(value_type, nested_key_fmt, nested_value, docstring))
+                        continue
+
+            yield ""
+
+            comments = [docstring]
             default = field.default
             if value == default:
                 value = None
             if default is MISSING or default is None:
-                if default is None:
-                    yield "# Optional."
-                else:
-                    yield "# Mandatory."
-                if value is None:
+                comments.append("Optional." if default is None else "Mandatory.")
+            else:
+                comments.append(f"Default:\n{format_toml_pair(key, default)}")
+            yield from _format_comments(*comments)
+
+            if value is None:
+                if default is MISSING or default is None:
                     comment = "# " if default is None else ""
                     key_fmt = "".join(_iter_format_key(key))
-                    value_fmt = _format_value_for_type(self._class_info.field_types[field.name])
+                    value_fmt = _format_value_for_type(field_type)
                     yield f"{comment}{key_fmt} = {value_fmt}"
             else:
-                yield "# Default:"
-                yield f"# {format_toml_pair(key, default)}"
-            if value is not None:
                 yield f"{format_toml_pair(key, value)}"
-
-    def _format_inline(self) -> Iterable[str]:
-        yield "{"
-        first = True
-        for field_name, field_type in self._class_info.field_types.items():
-            if first:
-                first = False
-            else:
-                yield ", "
-            yield from _iter_format_key(field_name.replace("_", "-"))
-            yield " = "
-            yield _format_value_for_type(field_type)
-        yield "}"
 
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
@@ -487,6 +533,20 @@ class Binder(Generic[T]):
                 case _:
                     data = tomllib.load(file)
             return self.bind(data)
+
+
+@dataclass
+class Table(Generic[T]):
+    """The information to format a TOML table."""
+
+    binder: Binder[T]
+    key_fmt: str
+    value: T | None
+    docstring: str | None
+    optional: bool = False
+
+    def prefix_context(self, context: str) -> Table[T]:
+        return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
 
 def format_toml_pair(key: str, value: object) -> str:
@@ -642,6 +702,20 @@ def _iter_format_value(value: object) -> Iterator[str]:
             raise TypeError(type(value).__name__)
 
 
+def _format_comments(*comments: str | None) -> Iterator[str]:
+    separator = False
+    for comment in comments:
+        if comment:
+            contains_empty = False
+            for line in comment.split("\n"):
+                if separator:
+                    yield "#"
+                    separator = False
+                yield f"# {line}".rstrip()
+                contains_empty |= not line
+            separator = contains_empty
+
+
 def get_field_docstrings(dataclass: type[Any]) -> Mapping[str, str]:
     """
     Return a mapping of field name to the docstring for that field.
@@ -682,7 +756,7 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
     yield from Binder(class_or_instance).format_toml_template()
 
 
-def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
+def _format_value_for_type(field_type: type[Any]) -> str:
     origin = get_origin(field_type)
     if origin is None:
         if field_type is str:
@@ -701,8 +775,6 @@ def _format_value_for_type(field_type: type[Any] | Binder[Any]) -> str:
             return "2020-01-01"
         elif field_type is time or field_type is timedelta:
             return "00:00:00"
-        elif isinstance(field_type, Binder):
-            return "".join(field_type._format_inline())
         else:
             # We have handled all the non-generic types supported by _collect_type().
             raise AssertionError(field_type)
