@@ -422,10 +422,8 @@ class Binder(Generic[T]):
         queue: list[tuple[Binder[Any], Any, str, str | None, bool]] = [(self, self._instance, "", None, False)]
 
         def defer(
-            binder: Binder[T2], key: str, value: T2 | None, docstring: str | None, optional: bool  # noqa: FBT001
+            binder: Binder[T2], key_fmt: str, value: T2 | None, docstring: str | None, optional: bool  # noqa: FBT001
         ) -> None:
-            # Most Python names are valid as bare keys, but only if they're ASCII-only.
-            key_fmt = "".join(_iter_format_key(key))
             queue.append((binder, value, f"{context}.{key_fmt}" if context else key_fmt, docstring, optional))
 
         skip_empty = True
@@ -462,13 +460,29 @@ class Binder(Generic[T]):
                 continue
 
             key = field.name.replace("_", "-")
+            # Most Python names are valid as bare keys, but not if they contain non-ASCII characters.
+            key_fmt = "".join(_iter_format_key(key))
             value = None if instance is None else getattr(instance, field.name)
             docstring = docstrings.get(field.name)
 
             field_type = field_types[field.name]
             if isinstance(field_type, Binder):
-                defer(field_type, key, value, docstring, field.default is not MISSING)
+                defer(field_type, key_fmt, value, docstring, field.default is not MISSING)
                 continue
+            origin = get_origin(field_type)
+            if origin is not None and issubclass(origin, Mapping):
+                key_type, value_type = get_args(field_type)
+                if isinstance(value_type, Binder):
+                    if value is None:
+                        nested_map = {f"{key_fmt}.<name>": None}
+                    else:
+                        nested_map = {
+                            f"{key_fmt}.{''.join(_iter_format_key(nested_key))}": nested_value
+                            for nested_key, nested_value in value.items()
+                        }
+                    for nested_key_fmt, nested_value in nested_map.items():
+                        defer(value_type, nested_key_fmt, nested_value, docstring, False)  # noqa: FBT003
+                    continue
 
             yield ""
 

@@ -357,25 +357,21 @@ class NestedConfig:
     with_default: str = "n/a"
 
 
-def test_format_template_optional_nested() -> None:
-    @dataclass
-    class Config:
-        nested: NestedConfig | None = None
-        """This is the docstring for the nested field."""
-
-    template = "\n".join(Binder(Config).format_toml_template())
-    assert template == (
-        """
+def _expected_formatting_of_nested_dataclass(
+    name: str, *, inner_int: int = 0, inner_str: str = "???", optional_table: bool = False
+) -> str:
+    optional_table_str = "# Optional table.\n" if optional_table else ""
+    return f"""
 # This table is bound to a nested dataclass.
 # This is the docstring for the nested field.
-# Optional table.
-[nested]
+{optional_table_str}\
+[{name}]
 
 # Mandatory.
-inner-int = 0
+inner-int = {inner_int}
 
 # Mandatory.
-inner-str = '???'
+inner-str = '{inner_str}'
 
 # Optional.
 # optional = '???'
@@ -383,6 +379,47 @@ inner-str = '???'
 # Default:
 # with-default = 'n/a'
 """.strip()
+
+
+def test_format_template_optional_nested() -> None:
+    @dataclass
+    class Config:
+        nested: NestedConfig | None = None
+        """This is the docstring for the nested field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == _expected_formatting_of_nested_dataclass("nested", optional_table=True)
+
+
+def test_format_template_mapping_nested_class() -> None:
+    @dataclass
+    class Config:
+        nested: dict[str, NestedConfig]
+        """This is the docstring for the nested field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == _expected_formatting_of_nested_dataclass("nested.<name>")
+
+
+def test_format_template_mapping_nested_value() -> None:
+    @dataclass
+    class Config:
+        nested: dict[str, NestedConfig]
+        """This is the docstring for the nested field."""
+
+    config = Config(
+        nested={
+            "first": NestedConfig(inner_int=1, inner_str="one"),
+            "second": NestedConfig(inner_int=2, inner_str="two"),
+        }
+    )
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == "\n".join(
+        (
+            _expected_formatting_of_nested_dataclass("nested.first", inner_int=1, inner_str="one"),
+            "",
+            _expected_formatting_of_nested_dataclass("nested.second", inner_int=2, inner_str="two"),
+        )
     )
 
 
