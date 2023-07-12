@@ -184,7 +184,6 @@ def _get_fields(cls: type) -> Iterator[tuple[str, type]]:
 _TIMEDELTA_SUFFIXES = {"days", "seconds", "microseconds", "milliseconds", "minutes", "hours", "weeks"}
 
 T = TypeVar("T")
-T2 = TypeVar("T2")
 
 
 @dataclass(slots=True)
@@ -419,27 +418,26 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
-        queue: list[tuple[Binder[Any], Any, str, str | None, bool]] = [(self, self._instance, "", None, False)]
+        queue: list[Table[Any]] = [Table(self, "", self._instance, None)]
 
-        def defer(
-            binder: Binder[T2], key_fmt: str, value: T2 | None, docstring: str | None, optional: bool  # noqa: FBT001
-        ) -> None:
-            queue.append((binder, value, f"{context}.{key_fmt}" if context else key_fmt, docstring, optional))
+        def defer(table: Table[Any]) -> None:
+            queue.append(table.prefix_context(context))
 
         skip_empty = True
         while queue:
-            binder, instance, context, docstring, optional = queue.pop(0)
+            table = queue.pop(0)
+            context = table.key_fmt
             output_header = bool(context)
 
-            for line in binder._format_toml_table(instance, defer):
+            for line in table.binder._format_toml_table(table.value, defer):
                 if line or not skip_empty:
                     if output_header:
                         if not skip_empty:
                             yield ""
                         yield from _format_comments(
-                            binder._class_info.class_docstring,
-                            docstring,
-                            "Optional table." if optional else None,
+                            table.binder._class_info.class_docstring,
+                            table.docstring,
+                            "Optional table." if table.optional else None,
                         )
                         yield f"[{context}]"
                         if line:
@@ -448,9 +446,7 @@ class Binder(Generic[T]):
                     yield line
                     skip_empty = False
 
-    def _format_toml_table(
-        self, instance: T | None, defer: Callable[[Binder[T2], str, T2 | None, str | None, bool], None]
-    ) -> Iterator[str]:
+    def _format_toml_table(self, instance: T | None, defer: Callable[[Table[Any]], None]) -> Iterator[str]:
         dataclass = self._dataclass
         field_types = self._class_info.field_types
         docstrings = self._class_info.field_docstrings
@@ -467,7 +463,7 @@ class Binder(Generic[T]):
 
             field_type = field_types[field.name]
             if isinstance(field_type, Binder):
-                defer(field_type, key_fmt, value, docstring, field.default is not MISSING)
+                defer(Table(field_type, key_fmt, value, docstring, field.default is not MISSING))
                 continue
             origin = get_origin(field_type)
             if origin is not None:
@@ -482,14 +478,14 @@ class Binder(Generic[T]):
                                 for nested_key, nested_value in value.items()
                             }
                         for nested_key_fmt, nested_value in nested_map.items():
-                            defer(value_type, nested_key_fmt, nested_value, docstring, False)  # noqa: FBT003
+                            defer(Table(value_type, nested_key_fmt, nested_value, docstring))
                         continue
                 elif issubclass(origin, Sequence):
                     (value_type,) = get_args(field_type)
                     if isinstance(value_type, Binder):
                         nested_key_fmt = f"[{key_fmt}]"
                         for nested_value in [None] if value is None else value:
-                            defer(value_type, nested_key_fmt, nested_value, docstring, False)  # noqa: FBT003
+                            defer(Table(value_type, nested_key_fmt, nested_value, docstring))
                         continue
 
             yield ""
@@ -537,6 +533,20 @@ class Binder(Generic[T]):
                 case _:
                     data = tomllib.load(file)
             return self.bind(data)
+
+
+@dataclass
+class Table(Generic[T]):
+    """The information to format a TOML table."""
+
+    binder: Binder[T]
+    key_fmt: str
+    value: T | None
+    docstring: str | None
+    optional: bool = False
+
+    def prefix_context(self, context: str) -> Table[T]:
+        return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
 
 def format_toml_pair(key: str, value: object) -> str:
