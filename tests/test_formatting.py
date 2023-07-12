@@ -423,6 +423,40 @@ def test_format_template_mapping_nested_value() -> None:
     )
 
 
+def test_format_template_mapping_untyped_class() -> None:
+    @dataclass
+    class Config:
+        untyped: dict[str, Any] | None = None
+        """This is the docstring for the untyped field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == (
+        """
+# This is the docstring for the untyped field.
+# Optional table.
+[untyped]
+""".strip()
+    )
+
+
+def test_format_template_mapping_untyped_value() -> None:
+    @dataclass
+    class Config:
+        untyped: dict[str, Any]
+        """This is the docstring for the untyped field."""
+
+    config = Config(untyped={"one": 1, "two": 2.0})
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == (
+        """
+# This is the docstring for the untyped field.
+[untyped]
+one = 1
+two = 2.0
+""".strip()
+    )
+
+
 def test_format_template_sequence_nested_class() -> None:
     @dataclass
     class Config:

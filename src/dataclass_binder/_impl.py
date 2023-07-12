@@ -467,6 +467,9 @@ class Binder(Generic[T]):
                         for nested_key_fmt, nested_value in nested_map.items():
                             defer(Table(value_type, nested_key_fmt, nested_value, docstring))
                         continue
+                    if value_type is object:  # Any
+                        defer(Table(None, key_fmt, value, docstring, field.default is not MISSING))
+                        continue
                 elif issubclass(origin, Sequence):
                     (value_type,) = get_args(field_type)
                     if isinstance(value_type, Binder):
@@ -526,7 +529,7 @@ class Binder(Generic[T]):
 class Table(Generic[T]):
     """The information to format a TOML table."""
 
-    binder: Binder[T]
+    binder: Binder[T] | None
     key_fmt: str
     value: T | None
     field_docstring: str | None
@@ -534,18 +537,28 @@ class Table(Generic[T]):
 
     @property
     def class_docstring(self) -> str | None:
-        return self.binder._class_info.class_docstring
+        binder = self.binder
+        return None if binder is None else binder._class_info.class_docstring
 
     def prefix_context(self, context: str) -> Table[T]:
         return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
     def format_table(self, defer: Callable[[Table[Any]], None]) -> Iterator[str]:
-        output_header = bool(self.key_fmt)
-        for line in self.binder._format_toml_table(self.value, defer):
-            if output_header:
-                yield from self.format_header()
-                output_header = False
-            yield line
+        if (binder := self.binder) is None:
+            match self.value:
+                case Mapping() as mapping:
+                    content = [format_toml_pair(k, v) for k, v in mapping.items()]
+                case _:
+                    content = []
+        else:
+            content = list(binder._format_toml_table(self.value, defer))
+            if not content:
+                return
+
+        if self.key_fmt:
+            yield from self.format_header()
+
+        yield from content
 
     def format_header(self) -> Iterator[str]:
         yield ""
