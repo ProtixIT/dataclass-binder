@@ -423,6 +423,40 @@ def test_format_template_mapping_nested_value() -> None:
     )
 
 
+def test_format_template_mapping_untyped_class() -> None:
+    @dataclass
+    class Config:
+        untyped: dict[str, Any] | None = None
+        """This is the docstring for the untyped field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == (
+        """
+# This is the docstring for the untyped field.
+# Optional table.
+[untyped]
+""".strip()
+    )
+
+
+def test_format_template_mapping_untyped_value() -> None:
+    @dataclass
+    class Config:
+        untyped: dict[str, Any]
+        """This is the docstring for the untyped field."""
+
+    config = Config(untyped={"one": 1, "two": 2.0})
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == (
+        """
+# This is the docstring for the untyped field.
+[untyped]
+one = 1
+two = 2.0
+""".strip()
+    )
+
+
 def test_format_template_sequence_nested_class() -> None:
     @dataclass
     class Config:
@@ -452,6 +486,65 @@ def test_format_template_sequence_nested_value() -> None:
             "",
             _expected_formatting_of_nested_dataclass("[nested]", inner_int=2, inner_str="two"),
         )
+    )
+
+
+def test_format_template_sequence_untyped_class() -> None:
+    @dataclass
+    class Config:
+        untyped: list[Any] | None = None
+        """This is the docstring for the untyped field."""
+
+    template = "\n".join(Binder(Config).format_toml_template())
+    assert template == (
+        """
+# This is the docstring for the untyped field.
+# Optional table.
+[[untyped]]
+""".strip()
+    )
+
+
+def test_format_template_sequence_untyped_value_table() -> None:
+    """Untyped sequences are formatted as tables, if possible."""
+
+    @dataclass
+    class Config:
+        untyped: list[Any]
+        """This is the docstring for the untyped field."""
+
+    config = Config([{"one": 1, "two": 2.0}, Config(["three", False])])
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == (
+        """
+# This is the docstring for the untyped field.
+[[untyped]]
+one = 1
+two = 2.0
+
+# This is the docstring for the untyped field.
+[[untyped]]
+untyped = ['three', false]
+""".strip()
+    )
+
+
+def test_format_template_sequence_untyped_value_inline() -> None:
+    """Untyped sequences with mixed content must be formatted inline."""
+
+    @dataclass
+    class Config:
+        untyped: list[Any]
+        """This is the docstring for the untyped field."""
+
+    config = Config([1, 2.0, Config(["three", False])])
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == (
+        """
+# This is the docstring for the untyped field.
+# Mandatory.
+untyped = [1, 2.0, {untyped = ['three', false]}]
+""".strip()
     )
 
 
