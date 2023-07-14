@@ -618,6 +618,17 @@ inner-str = 'foo'
     )
 
 
+@dataclass
+class BinaryTree:
+    left: BinaryTree | None = None
+    right: BinaryTree | None = None
+    value: int | None = None
+
+
+def test_bind_recursive() -> None:
+    Binder(BinaryTree)
+
+
 @pytest.fixture()
 def sourceless_class() -> type[Any]:
     """A class for which no source code is available."""

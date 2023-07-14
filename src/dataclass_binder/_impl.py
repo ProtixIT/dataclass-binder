@@ -200,14 +200,15 @@ class _ClassInfo(Generic[T]):
         try:
             return cls._cache[dataclass]
         except KeyError:
-            info = cls(
-                dataclass,
-                {
-                    field_name: _collect_type(field_type, f"{dataclass.__name__}.{field_name}")
-                    for field_name, field_type in _get_fields(dataclass)
-                },
-            )
+            # Populate field_types *after* adding new instance to the cache to make sure
+            # _collect_type() will find the given dataclass if it's accessed recursively.
+            field_types: dict[str, type | Binder[Any]] = {}
+            info = cls(dataclass, field_types)
             cls._cache[dataclass] = info
+            field_types.update(
+                (field_name, _collect_type(field_type, f"{dataclass.__name__}.{field_name}"))
+                for field_name, field_type in _get_fields(dataclass)
+            )
             return info
 
     @property
