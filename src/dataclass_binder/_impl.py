@@ -6,7 +6,17 @@ import ast
 import operator
 import re
 import sys
-from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
+from collections.abc import (
+    Callable,
+    Collection,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    Sequence,
+    Set,
+)
 from dataclasses import MISSING, asdict, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import reduce
@@ -420,7 +430,7 @@ class Binder(Generic[T]):
         """
 
         table = Table(self, "", self._instance, None)
-        lines = table.format_table()
+        lines = table.format_table(set())
         for line in lines:  # pragma: no cover
             if line:
                 yield line
@@ -542,20 +552,25 @@ class Table(Generic[T]):
     def prefix_context(self, context: str) -> Table[T]:
         return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
-    def format_table(self) -> Iterator[str]:
+    def format_table(self, inside: Set[type]) -> Iterator[str]:
         child_tables: list[Table[Any]] = []
         context = self.key_fmt
+        value = self.value
 
         if (binder := self.binder) is None:
-            match self.value:
+            match value:
                 case Mapping() as mapping:
                     content = [format_toml_pair(k, v) for k, v in mapping.items()]
                 case dc if is_dataclass(dc):
                     content = [format_toml_pair(k, v) for k, v in asdict(dc).items()]  # type: ignore[arg-type]
                 case _:
                     content = []
+        elif value is None and binder._dataclass in inside:
+            # Prevent infinite recursion.
+            content = None
         else:
-            content = list(binder._format_toml_table(self.value, child_tables.append))
+            inside |= {binder._dataclass}
+            content = list(binder._format_toml_table(value, child_tables.append))
             if not content:
                 content = None
 
@@ -566,7 +581,7 @@ class Table(Generic[T]):
             yield from content
 
         for table in child_tables:
-            yield from table.prefix_context(context).format_table()
+            yield from table.prefix_context(context).format_table(inside)
 
     def format_header(self) -> Iterator[str]:
         yield ""
