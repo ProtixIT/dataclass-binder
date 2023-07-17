@@ -419,20 +419,13 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
-        queue: list[Table[Any]] = [Table(self, "", self._instance, None)]
-
-        def defer(table: Table[Any]) -> None:
-            queue.append(table.prefix_context(context))
-
-        skip_empty = True
-        while queue:
-            table = queue.pop(0)
-            context = table.key_fmt
-            for line in table.format_table(defer):
-                if not line and skip_empty:
-                    skip_empty = False
-                    continue
+        table = Table(self, "", self._instance, None)
+        lines = table.format_table()
+        for line in lines:  # pragma: no cover
+            if line:
                 yield line
+                break
+        yield from lines
 
     def _format_toml_table(self, instance: T | None, defer: Callable[[Table[Any]], None]) -> Iterator[str]:
         dataclass = self._dataclass
@@ -549,7 +542,10 @@ class Table(Generic[T]):
     def prefix_context(self, context: str) -> Table[T]:
         return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
-    def format_table(self, defer: Callable[[Table[Any]], None]) -> Iterator[str]:
+    def format_table(self) -> Iterator[str]:
+        child_tables: list[Table[Any]] = []
+        context = self.key_fmt
+
         if (binder := self.binder) is None:
             match self.value:
                 case Mapping() as mapping:
@@ -559,14 +555,18 @@ class Table(Generic[T]):
                 case _:
                     content = []
         else:
-            content = list(binder._format_toml_table(self.value, defer))
+            content = list(binder._format_toml_table(self.value, child_tables.append))
             if not content:
-                return
+                content = None
 
-        if self.key_fmt:
-            yield from self.format_header()
+        if content is not None:
+            if context:
+                yield from self.format_header()
 
-        yield from content
+            yield from content
+
+        for table in child_tables:
+            yield from table.prefix_context(context).format_table()
 
     def format_header(self) -> Iterator[str]:
         yield ""
