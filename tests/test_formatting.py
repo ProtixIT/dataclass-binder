@@ -618,6 +618,66 @@ inner-str = 'foo'
     )
 
 
+@dataclass
+class BinaryTree:
+    value: int
+    left: BinaryTree | None = None
+    right: BinaryTree | None = None
+
+
+def test_format_template_depth_first() -> None:
+    """Tables are formatted depth-first: children before siblings."""
+
+    tree = BinaryTree(
+        value=1,
+        left=BinaryTree(value=2, left=BinaryTree(value=3), right=BinaryTree(value=4)),
+        right=BinaryTree(value=5, left=BinaryTree(value=6), right=BinaryTree(value=7)),
+    )
+    template = "\n".join(Binder(tree).format_toml_template())
+    assert template == (
+        """
+# Mandatory.
+value = 1
+
+# Optional table.
+[left]
+
+# Mandatory.
+value = 2
+
+# Optional table.
+[left.left]
+
+# Mandatory.
+value = 3
+
+# Optional table.
+[left.right]
+
+# Mandatory.
+value = 4
+
+# Optional table.
+[right]
+
+# Mandatory.
+value = 5
+
+# Optional table.
+[right.left]
+
+# Mandatory.
+value = 6
+
+# Optional table.
+[right.right]
+
+# Mandatory.
+value = 7
+""".strip()
+    )
+
+
 @pytest.fixture()
 def sourceless_class() -> type[Any]:
     """A class for which no source code is available."""
