@@ -450,11 +450,12 @@ class Binder(Generic[T]):
             # Most Python names are valid as bare keys, but not if they contain non-ASCII characters.
             key_fmt = "".join(_iter_format_key(key))
             value = None if instance is None else getattr(instance, field.name)
+            optional = field.default is not MISSING
             docstring = docstrings.get(field.name)
 
             field_type = field_types[field.name]
             if isinstance(field_type, Binder):
-                defer(Table(field_type, key_fmt, value, docstring, field.default is not MISSING))
+                defer(Table(field_type, key_fmt, value, docstring, optional))
                 continue
             origin = get_origin(field_type)
             if origin is not None:
@@ -472,7 +473,7 @@ class Binder(Generic[T]):
                             defer(Table(value_type, nested_key_fmt, nested_value, docstring))
                         continue
                     if value_type is object:  # Any
-                        defer(Table(None, key_fmt, value, docstring, field.default is not MISSING))
+                        defer(Table(None, key_fmt, value, docstring, optional))
                         continue
                 elif issubclass(origin, Sequence):
                     (value_type,) = get_args(field_type)
@@ -482,7 +483,6 @@ class Binder(Generic[T]):
                         and (value is None or all(isinstance(item, Mapping) or is_dataclass(item) for item in value))
                     ):
                         nested_key_fmt = f"[{key_fmt}]"
-                        optional = field.default is not MISSING
                         for nested_value in [None] if value is None else value:
                             defer(Table(binder, nested_key_fmt, nested_value, docstring, optional))
                         continue
@@ -493,14 +493,14 @@ class Binder(Generic[T]):
             default = field.default
             if value == default:
                 value = None
-            if default is MISSING or default is None:
+            if not optional or default is None:
                 comments.append("Optional." if default is None else "Mandatory.")
             else:
                 comments.append(f"Default:\n{format_toml_pair(key, default)}")
             yield from _format_comments(*comments)
 
             if value is None:
-                if default is MISSING or default is None:
+                if not optional or default is None:
                     comment = "# " if default is None else ""
                     key_fmt = "".join(_iter_format_key(key))
                     value_fmt = _format_value_for_type(field_type)
