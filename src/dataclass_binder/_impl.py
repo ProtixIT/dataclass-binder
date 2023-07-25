@@ -561,6 +561,11 @@ class Table(Generic[T]):
         return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
     def format_table(self, inside: Set[type]) -> Iterator[str]:
+        """
+        The `inside` parameter keeps track of which dataclasses we are currently outputting,
+        to prevent infinite recursion.
+        """
+
         child_tables: list[Table[Any]] = []
         context = self.key_fmt
         value = self.value
@@ -574,7 +579,6 @@ class Table(Generic[T]):
                 case _:
                     content = []
         elif value is None and binder._dataclass in inside:
-            # Prevent infinite recursion.
             content = None
         else:
             inside |= {binder._dataclass}
