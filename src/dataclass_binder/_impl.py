@@ -450,8 +450,17 @@ class Binder(Generic[T]):
             # Most Python names are valid as bare keys, but not if they contain non-ASCII characters.
             key_fmt = "".join(_iter_format_key(key))
             value = None if instance is None else getattr(instance, field.name)
-            optional = field.default is not MISSING
             docstring = docstrings.get(field.name)
+
+            default = field.default
+            if default is MISSING:
+                default_factory = field.default_factory
+                if default_factory is not MISSING:
+                    # We don't call the factory:
+                    # - to avoid listing a dynamic value as a default, like the current date
+                    # - to not trigger any unwanted side effects
+                    default = {list: [], dict: {}}.get(default_factory)  # type: ignore[call-overload]
+            optional = default is not MISSING
 
             field_type = field_types[field.name]
             if isinstance(field_type, Binder):
@@ -490,7 +499,6 @@ class Binder(Generic[T]):
             yield ""
 
             comments = [docstring]
-            default = field.default
             if value == default:
                 value = None
             if not optional or default is None:

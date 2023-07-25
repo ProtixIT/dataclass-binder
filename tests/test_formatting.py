@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
@@ -453,6 +454,37 @@ def test_format_template_mapping_untyped_value() -> None:
 [untyped]
 one = 1
 two = 2.0
+""".strip()
+    )
+
+
+def test_format_template_default_factory() -> None:
+    """Fields with default factories also have defaults."""
+
+    @dataclass
+    class Config:
+        words: list[str] = field(default_factory=list)
+        numbers: Sequence[int] = field(default_factory=lambda: tuple(range(10)))
+
+    class_template = "\n".join(Binder(Config).format_toml_template())
+    assert class_template == (
+        """
+# Default:
+# words = []
+
+# Optional.
+# numbers = []
+""".strip()
+    )
+
+    instance_template = "\n".join(Binder(Config()).format_toml_template())
+    assert instance_template == (
+        """
+# Default:
+# words = []
+
+# Optional.
+numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 """.strip()
     )
 
