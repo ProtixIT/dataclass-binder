@@ -499,12 +499,12 @@ class Binder(Generic[T]):
             yield ""
 
             comments = [docstring]
-            if value == default:
-                value = None
             if not optional or default is None:
+                fmt_default = None
                 comments.append("Optional." if default is None else "Mandatory.")
             else:
-                comments.append(f"Default:\n{format_toml_pair(key, default)}")
+                fmt_default = format_toml_pair(key, default)
+                comments.append(f"Default:\n{fmt_default}")
             yield from _format_comments(*comments)
 
             if value is None:
@@ -514,7 +514,9 @@ class Binder(Generic[T]):
                     value_fmt = _format_value_for_type(field_type)
                     yield f"{comment}{key_fmt} = {value_fmt}"
             else:
-                yield f"{format_toml_pair(key, value)}"
+                fmt_value = format_toml_pair(key, value)
+                if fmt_value != fmt_default:
+                    yield fmt_value
 
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
@@ -561,6 +563,11 @@ class Table(Generic[T]):
         return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
     def format_table(self, inside: Set[type]) -> Iterator[str]:
+        """
+        The `inside` parameter keeps track of which dataclasses we are currently outputting,
+        to prevent infinite recursion.
+        """
+
         child_tables: list[Table[Any]] = []
         context = self.key_fmt
         value = self.value
@@ -574,7 +581,6 @@ class Table(Generic[T]):
                 case _:
                     content = []
         elif value is None and binder._dataclass in inside:
-            # Prevent infinite recursion.
             content = None
         else:
             inside |= {binder._dataclass}
