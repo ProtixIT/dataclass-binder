@@ -489,6 +489,27 @@ numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     )
 
 
+def test_format_template_sequence_default() -> None:
+    """
+    When formatting, a sequence value is considered equal to the default if it would produce identical TOML,
+    even if the Python type is different.
+    """
+
+    @dataclass
+    class Config:
+        things: Sequence[str] = ("this", "that")
+
+    config = Config(things=["this", "that"])
+
+    template = "\n".join(Binder(config).format_toml_template())
+    assert template == (
+        """
+# Default:
+# things = ['this', 'that']
+""".strip()
+    )
+
+
 def test_format_template_sequence_nested_class() -> None:
     @dataclass
     class Config:
