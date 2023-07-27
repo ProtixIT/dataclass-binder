@@ -17,7 +17,7 @@ from collections.abc import (
     Sequence,
     Set,
 )
-from dataclasses import MISSING, asdict, dataclass, fields, is_dataclass, replace
+from dataclasses import MISSING, Field, asdict, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import reduce
 from importlib import import_module
@@ -165,7 +165,7 @@ def _find_field(full_name: str, field_names: Collection[str]) -> tuple[str, str 
         raise KeyError(full_name)
 
 
-def _get_fields(cls: type) -> Iterator[tuple[str, type]]:
+def _get_fields(cls: type) -> Iterator[tuple[Field, type]]:
     """
     Iterates through all the fields in a dataclass.
 
@@ -188,7 +188,18 @@ def _get_fields(cls: type) -> Iterator[tuple[str, type]]:
                     annotation = eval(annotation, cls_globals, cls_locals)  # noqa: PGH001
                 except NameError as ex:
                     raise TypeError(f"Failed to parse annotation of field '{cls.__name__}.{name}': {ex}") from None
-            yield name, annotation
+            yield field, annotation
+
+
+def _check_field(field: Field, field_type: type, context: str) -> None:
+    """
+    Perform some checks on the validity of a field definition.
+
+    This does not do a full type check: there are better tools for that.
+    Instead, it checks specific limitations that our Binder imposes on dataclasses.
+    """
+    if get_origin(field_type) is UnionType and NoneType in get_args(field_type) and field.default is not None:
+        raise TypeError(f"Default for optional field '{context}' is not None")
 
 
 _TIMEDELTA_SUFFIXES = {"days", "seconds", "microseconds", "milliseconds", "minutes", "hours", "weeks"}
@@ -215,10 +226,11 @@ class _ClassInfo(Generic[T]):
             field_types: dict[str, type | Binder[Any]] = {}
             info = cls(dataclass, field_types)
             cls._cache[dataclass] = info
-            field_types.update(
-                (field_name, _collect_type(field_type, f"{dataclass.__name__}.{field_name}"))
-                for field_name, field_type in _get_fields(dataclass)
-            )
+            for field, field_type in _get_fields(dataclass):
+                field_name = field.name
+                context = f"{dataclass.__name__}.{field_name}"
+                field_types[field_name] = _collect_type(field_type, context)
+                _check_field(field, field_type, context)
             return info
 
     @property
@@ -431,7 +443,7 @@ class Binder(Generic[T]):
 
         table = Table(self, "", self._instance, None)
         lines = table.format_table(set())
-        for line in lines:  # pragma: no cover
+        for line in lines:
             if line:
                 yield line
                 break

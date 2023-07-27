@@ -207,6 +207,14 @@ def test_format_value_dict_suffix(*, optional: bool, string: bool) -> None:
     assert format_toml_pair("value", {"delay": timedelta(days=2)}) == "value = {delay-days = 2}"
 
 
+def test_format_empty_dataclass() -> None:
+    @dataclass
+    class Empty:
+        pass
+
+    assert list(Binder(Empty).format_toml_template()) == []
+
+
 @dataclass(kw_only=True)
 class Inner:
     key_containing_underscores: bool
