@@ -711,7 +711,34 @@ def _iter_format_key(key: str) -> Iterator[str]:
     if _TOML_BARE_KEY.match(key):
         yield key
     else:
-        yield from _iter_format_value(key)
+        yield from _iter_format_string(key)
+
+
+def _iter_format_string(value: str) -> Iterator[str]:
+    # Ideally we could assume that every tool along the way defaults to UTF-8 and just output that,
+    # but I don't think we live in that world yet, so escape non-ASCII characters.
+    if value.isprintable() and value.isascii() and "'" not in value:
+        # Use a literal string if possible.
+        yield "'"
+        yield value
+        yield "'"
+    else:
+        # Use basic string otherwise.
+        yield '"'
+        for ch in value:
+            if ch.isascii():
+                try:
+                    yield _TOML_ESCAPES[ch]
+                except KeyError:
+                    if ch.isprintable():
+                        yield ch
+                    else:
+                        yield f"\\u{ord(ch):04X}"
+            elif ord(ch) < 0x10000:
+                yield f"\\u{ord(ch):04X}"
+            else:
+                yield f"\\U{ord(ch):08X}"
+        yield '"'
 
 
 def _iter_format_value(value: object) -> Iterator[str]:
@@ -721,30 +748,7 @@ def _iter_format_value(value: object) -> Iterator[str]:
         case int() | float():
             yield str(value)
         case str():
-            # Ideally we could assume that every tool along the way defaults to UTF-8 and just output that,
-            # but I don't think we live in that world yet, so escape non-ASCII characters.
-            if value.isprintable() and value.isascii() and "'" not in value:
-                # Use a literal string if possible.
-                yield "'"
-                yield value
-                yield "'"
-            else:
-                # Use basic string otherwise.
-                yield '"'
-                for ch in value:
-                    if ch.isascii():
-                        try:
-                            yield _TOML_ESCAPES[ch]
-                        except KeyError:
-                            if ch.isprintable():
-                                yield ch
-                            else:
-                                yield f"\\u{ord(ch):04X}"
-                    elif ord(ch) < 0x10000:
-                        yield f"\\u{ord(ch):04X}"
-                    else:
-                        yield f"\\U{ord(ch):08X}"
-                yield '"'
+            yield from _iter_format_string(value)
         case date() | time():
             yield value.isoformat()
         case Mapping():
