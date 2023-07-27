@@ -430,6 +430,18 @@ class Binder(Generic[T]):
         else:
             return replace(instance, **parsed)  # type: ignore[type-var]
 
+    def format_toml(self) -> Iterator[str]:
+        """
+        Yield lines of TOML text for populating the dataclass or object that we are binding to.
+
+        If we are binding to an object, non-default values from that object will be output.
+
+        If we are binding to a class, example values for mandatory fields will be derived from the field types;
+        these example values can be syntactically incorrect placeholders.
+        """
+
+        return self._format_toml_root(template=False)
+
     def format_toml_template(self) -> Iterator[str]:
         """
         Yield lines of TOML text as a template for populating the dataclass or object that we are binding to.
@@ -441,15 +453,20 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
+        return self._format_toml_root(template=True)
+
+    def _format_toml_root(self, *, template: bool) -> Iterator[str]:
         table = Table(self, "", self._instance, None)
-        lines = table.format_table(set())
+        lines = table.format_table(set(), template=template)
         for line in lines:
             if line:
                 yield line
                 break
         yield from lines
 
-    def _format_toml_table(self, instance: T | None, defer: Callable[[Table[Any]], None]) -> Iterator[str]:
+    def _format_toml_table(
+        self, instance: T | None, defer: Callable[[Table[Any]], None], *, template: bool
+    ) -> Iterator[str]:
         dataclass = self._dataclass
         field_types = self._class_info.field_types
         docstrings = self._class_info.field_docstrings
@@ -520,18 +537,20 @@ class Binder(Generic[T]):
                 # Make up an example value.
                 value_fmt = f"{key_fmt} = {_format_value_for_type(field_type)}"
 
-            comments = [docstring]
-            if not optional:
-                comments.append("Mandatory.")
-            elif default_fmt is not None:
-                comments.append(f"Default:\n{default_fmt}")
-            elif value_fmt is not None:
-                # We don't need an example value in the comment if we're outputting a value line.
-                comments.append("Optional.")
-            else:
-                # We have no value; we do have a default but it's unformattable.
-                comments.append(f"Optional.\n{key_fmt} = {_format_value_for_type(field_type)}")
-            yield from _format_comments(*comments, leading_newline=True)
+            if template or value_fmt is not None:
+                comments = [docstring]
+                if template:
+                    if not optional:
+                        comments.append("Mandatory.")
+                    elif default_fmt is not None:
+                        comments.append(f"Default:\n{default_fmt}")
+                    elif value_fmt is not None:
+                        # We don't need an example value in the comment if we're outputting a value line.
+                        comments.append("Optional.")
+                    else:
+                        # We have no value; we do have a default but it's unformattable.
+                        comments.append(f"Optional.\n{key_fmt} = {_format_value_for_type(field_type)}")
+                yield from _format_comments(*comments, leading_newline=True)
 
             if value_fmt is not None:
                 yield value_fmt
@@ -580,7 +599,7 @@ class Table(Generic[T]):
     def prefix_context(self, context: str) -> Table[T]:
         return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
-    def format_table(self, inside: Set[type]) -> Iterator[str]:
+    def format_table(self, inside: Set[type], *, template: bool) -> Iterator[str]:
         """
         The `inside` parameter keeps track of which dataclasses we are currently outputting,
         to prevent infinite recursion.
@@ -602,7 +621,7 @@ class Table(Generic[T]):
             content = None
         else:
             inside |= {binder._dataclass}
-            content = list(binder._format_toml_table(value, child_tables.append))
+            content = list(binder._format_toml_table(value, child_tables.append, template=template))
             if not content:
                 content = None
 
@@ -613,7 +632,8 @@ class Table(Generic[T]):
             yield from content
 
         for table in child_tables:
-            yield from table.prefix_context(context).format_table(inside)
+            if template or table.value is not None:
+                yield from table.prefix_context(context).format_table(inside, template=template)
 
     def format_header(self) -> Iterator[str]:
         yield ""

@@ -636,7 +636,11 @@ class MiddleConfig:
 @dataclass(kw_only=True)
 class PopulatedConfig:
     source_database_connection_url: str
+    """Database to read the data from."""
+
     destination_database_connection_url: str = "sqlite://"
+    """Database to write the data to."""
+
     middle: MiddleConfig
     webhook_urls: tuple[str, ...] = ()
 
@@ -651,9 +655,11 @@ def test_format_template_populated() -> None:
     template = "\n".join(Binder(config).format_toml_template())
     assert template == (
         """
+# Database to read the data from.
 # Mandatory.
 source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/<database name>'
 
+# Database to write the data to.
 # Default:
 # destination-database-connection-url = 'sqlite://'
 
@@ -677,6 +683,42 @@ inner-str = 'foo'
 # with-default = 'n/a'
 """.strip()
     )
+
+
+def test_format_populated() -> None:
+    config = PopulatedConfig(
+        source_database_connection_url="postgresql://<username>:<password>@<hostname>/<database name>",
+        destination_database_connection_url="sqlite://",
+        middle=MiddleConfig(NestedConfig(5, "foo")),
+        webhook_urls=("https://host1/refresh", "https://host2/refresh"),
+    )
+    template = "\n".join(Binder(config).format_toml())
+    assert template == (
+        """
+# Database to read the data from.
+source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/<database name>'
+webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
+
+# This table is bound to a nested dataclass.
+[middle.deepest]
+inner-int = 5
+inner-str = 'foo'
+""".strip()
+    )
+
+
+def test_format_optional_tables() -> None:
+    """Optional tables must be omitted during non-template formatting."""
+
+    @dataclass
+    class Config:
+        untyped: dict[str, Any]
+        """This is the docstring for the untyped field."""
+
+        nested: NestedConfig | None = None
+        """Optional nested dataclass."""
+
+    assert list(Binder(Config).format_toml()) == []
 
 
 @dataclass
