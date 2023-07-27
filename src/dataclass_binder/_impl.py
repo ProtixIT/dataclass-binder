@@ -522,7 +522,6 @@ class Binder(Generic[T]):
             if value is None:
                 if not optional or default is None:
                     comment = "# " if default is None else ""
-                    key_fmt = "".join(_iter_format_key(key))
                     value_fmt = _format_value_for_type(field_type)
                     yield f"{comment}{key_fmt} = {value_fmt}"
             else:
