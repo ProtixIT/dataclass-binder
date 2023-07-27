@@ -431,7 +431,7 @@ class Binder(Generic[T]):
 
         table = Table(self, "", self._instance, None)
         lines = table.format_table(set())
-        for line in lines:  # pragma: no cover
+        for line in lines:  # pragma: no branch
             if line:
                 yield line
                 break
