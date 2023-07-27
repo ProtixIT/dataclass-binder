@@ -630,7 +630,7 @@ def test_format_template_valid_value(*, field_type: type[Any], optional: bool, s
 class MiddleConfig:
     """This docstring will remain invisible, as its table is empty."""
 
-    deepest: NestedConfig
+    deepest: NestedConfig | None = None
 
 
 @dataclass(kw_only=True)
@@ -668,6 +668,7 @@ source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/
 webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
 
 # This table is bound to a nested dataclass.
+# Optional table.
 [middle.deepest]
 
 # Mandatory.

@@ -627,7 +627,7 @@ class Table(Generic[T]):
 
         if content is not None:
             if context:
-                yield from self.format_header()
+                yield from self.format_header(template=template)
 
             yield from content
 
@@ -635,12 +635,12 @@ class Table(Generic[T]):
             if template or table.value is not None:
                 yield from table.prefix_context(context).format_table(inside, template=template)
 
-    def format_header(self) -> Iterator[str]:
+    def format_header(self, *, template: bool) -> Iterator[str]:
         yield ""
         yield from _format_comments(
             self.class_docstring,
             self.field_docstring,
-            "Optional table." if self.optional else None,
+            "Optional table." if template and self.optional else None,
         )
         yield f"[{self.key_fmt}]"
 
