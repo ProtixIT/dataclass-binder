@@ -531,8 +531,7 @@ class Binder(Generic[T]):
             else:
                 # We have no value; we do have a default but it's unformattable.
                 comments.append(f"Optional.\n{key_fmt} = {_format_value_for_type(field_type)}")
-            yield ""
-            yield from _format_comments(*comments)
+            yield from _format_comments(*comments, leading_newline=True)
 
             if value_fmt is not None:
                 yield value_fmt
@@ -783,10 +782,22 @@ def _iter_format_value(value: object) -> Iterator[str]:
             raise TypeError(type(value).__name__)
 
 
-def _format_comments(*comments: str | None) -> Iterator[str]:
+def _format_comments(*comments: str | None, leading_newline: bool = False) -> Iterator[str]:
+    """
+    Yield lines containing a formatted version of the given comments.
+
+    Comments that are None will be ignored.
+    If `leading_newline` is True, an empty ine will be output before any comment lines,
+    but only if the output is non-empty.
+    """
+
     separator = False
     for comment in comments:
         if comment:
+            if leading_newline:
+                yield ""
+                leading_newline = False
+
             contains_empty = False
             for line in comment.split("\n"):
                 if separator:
