@@ -512,11 +512,11 @@ class Binder(Generic[T]):
 
             comments = [docstring]
             if not optional or default is None:
-                fmt_default = None
+                default_fmt = None
                 comments.append("Optional." if default is None else "Mandatory.")
             else:
-                fmt_default = format_toml_pair(key, default)
-                comments.append(f"Default:\n{fmt_default}")
+                default_fmt = format_toml_pair(key, default)
+                comments.append(f"Default:\n{default_fmt}")
             yield from _format_comments(*comments)
 
             if value is None:
@@ -526,9 +526,9 @@ class Binder(Generic[T]):
                     value_fmt = _format_value_for_type(field_type)
                     yield f"{comment}{key_fmt} = {value_fmt}"
             else:
-                fmt_value = format_toml_pair(key, value)
-                if fmt_value != fmt_default:
-                    yield fmt_value
+                actual_fmt = format_toml_pair(key, value)
+                if actual_fmt != default_fmt:
+                    yield actual_fmt
 
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
