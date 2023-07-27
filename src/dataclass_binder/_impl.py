@@ -508,26 +508,34 @@ class Binder(Generic[T]):
                             defer(Table(binder, nested_key_fmt, nested_value, docstring, optional))
                         continue
 
-            yield ""
+            default_fmt = None if default is MISSING or default is None else format_toml_pair(key, default)
+
+            if value is not None:
+                value_fmt: str | None = format_toml_pair(key, value)
+                if value_fmt == default_fmt:
+                    value_fmt = None
+            elif optional:
+                value_fmt = None
+            else:
+                # Make up an example value.
+                value_fmt = f"{key_fmt} = {_format_value_for_type(field_type)}"
 
             comments = [docstring]
-            if not optional or default is None:
-                default_fmt = None
-                comments.append("Optional." if default is None else "Mandatory.")
-            else:
-                default_fmt = format_toml_pair(key, default)
+            if not optional:
+                comments.append("Mandatory.")
+            elif default_fmt is not None:
                 comments.append(f"Default:\n{default_fmt}")
+            elif value_fmt is not None:
+                # We don't need an example value in the comment if we're outputting a value line.
+                comments.append("Optional.")
+            else:
+                # We have no value; we do have a default but it's unformattable.
+                comments.append(f"Optional.\n{key_fmt} = {_format_value_for_type(field_type)}")
+            yield ""
             yield from _format_comments(*comments)
 
-            if value is None:
-                if not optional or default is None:
-                    comment = "# " if default is None else ""
-                    value_fmt = _format_value_for_type(field_type)
-                    yield f"{comment}{key_fmt} = {value_fmt}"
-            else:
-                actual_fmt = format_toml_pair(key, value)
-                if actual_fmt != default_fmt:
-                    yield actual_fmt
+            if value_fmt is not None:
+                yield value_fmt
 
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
