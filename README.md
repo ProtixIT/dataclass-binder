@@ -535,5 +535,5 @@ In version 0.3.0, the function `format_template()` has been replaced by the meth
 ### 0.3.2 - 2023-07-27:
 
 - Document fields with a `default_factory` as optional in template ([#35](https://github.com/ProtixIT/dataclass-binder/pull/35))
-- Omit values that are formatted equally to the default ([#36](https://github.com/ProtixIT/dataclass-binder/pull/36))
+- Omit values from template that are formatted equally to the default ([#36](https://github.com/ProtixIT/dataclass-binder/pull/36))
 - Require fields with `None` in their annotation to have `None` as their default ([#37](https://github.com/ProtixIT/dataclass-binder/pull/37))
