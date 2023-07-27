@@ -531,3 +531,9 @@ In version 0.3.0, the function `format_template()` has been replaced by the meth
 
 - Generate template in depth-first order ([#28](https://github.com/ProtixIT/dataclass-binder/pull/28))
 - Fix binder creation and formatting for recursive dataclasses ([#28](https://github.com/ProtixIT/dataclass-binder/pull/28))
+
+### 0.3.2 - 2023-07-27:
+
+- Document fields with a `default_factory` as optional in template ([#35](https://github.com/ProtixIT/dataclass-binder/pull/35))
+- Omit values that are formatted equally to the default ([#36](https://github.com/ProtixIT/dataclass-binder/pull/36))
+- Require optional fields to have `None` as their default ([#37](https://github.com/ProtixIT/dataclass-binder/pull/37))
