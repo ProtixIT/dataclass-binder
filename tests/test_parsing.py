@@ -209,6 +209,24 @@ def test_bind_optional() -> None:
     assert config_present.trend_identifier == "fly"
 
 
+def test_specialize_optional_default() -> None:
+    """Optional fields must have a default of None, as we can't express None in TOML."""
+
+    @dataclass(frozen=True)
+    class BadConfig1:
+        name: str | None
+
+    with pytest.raises(TypeError, match=r"^Default for optional field 'BadConfig1.name' is not None"):
+        Binder(BadConfig1)
+
+    @dataclass(frozen=True)
+    class BadConfig2:
+        name: str | None = "Bob"
+
+    with pytest.raises(TypeError, match=r"^Default for optional field 'BadConfig2.name' is not None"):
+        Binder(BadConfig2)
+
+
 def test_bind_union() -> None:
     """Fields with a union type accept all of the options and reject values of other types."""
 
