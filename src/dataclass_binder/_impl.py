@@ -511,7 +511,8 @@ class Binder(Generic[T]):
                             defer(Table(value_type, nested_key_fmt, nested_value, docstring))
                         continue
                     if value_type is object:  # Any
-                        defer(Table(None, key_fmt, value, docstring, optional))
+                        if template or value or default:
+                            defer(Table(None, key_fmt, value, docstring, optional))
                         continue
                 elif issubclass(origin, Sequence):
                     (value_type,) = get_args(field_type)
@@ -609,6 +610,14 @@ class Table(Generic[T]):
         context = self.key_fmt
         value = self.value
 
+        if template:
+            defer = child_tables.append
+        else:
+
+            def defer(table: Table) -> None:
+                if table.value is not None or not table.optional:
+                    child_tables.append(table)
+
         if (binder := self.binder) is None:
             match value:
                 case Mapping() as mapping:
@@ -621,7 +630,7 @@ class Table(Generic[T]):
             content = None
         else:
             inside |= {binder._dataclass}
-            content = list(binder._format_toml_table(value, child_tables.append, template=template))
+            content = list(binder._format_toml_table(value, defer=defer, template=template))
             if not content:
                 content = None
 
@@ -632,8 +641,7 @@ class Table(Generic[T]):
             yield from content
 
         for table in child_tables:
-            if template or table.value is not None:
-                yield from table.prefix_context(context).format_table(inside, template=template)
+            yield from table.prefix_context(context).format_table(inside, template=template)
 
     def format_header(self, *, template: bool) -> Iterator[str]:
         yield ""

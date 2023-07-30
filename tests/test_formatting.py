@@ -713,13 +713,24 @@ def test_format_optional_tables() -> None:
 
     @dataclass
     class Config:
-        untyped: dict[str, Any]
-        """This is the docstring for the untyped field."""
+        untyped_mandatory: dict[str, Any]
+        """This is the docstring for the mandatory untyped field."""
+
+        untyped_optional: dict[str, Any] = field(default_factory=dict)
+        """This is the docstring for the optional untyped field."""
 
         nested: NestedConfig | None = None
         """Optional nested dataclass."""
 
-    assert list(Binder(Config).format_toml()) == []
+    expected = """
+# This is the docstring for the mandatory untyped field.
+[untyped-mandatory]
+""".strip()
+
+    assert "\n".join(Binder(Config).format_toml()) == expected
+
+    config = Config(untyped_mandatory={})
+    assert "\n".join(Binder(config).format_toml()) == expected
 
 
 @dataclass
