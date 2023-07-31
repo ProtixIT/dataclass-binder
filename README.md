@@ -574,3 +574,7 @@ In version 0.3.0, the function `format_template()` has been replaced by the meth
 - Document fields with a `default_factory` as optional in template ([#35](https://github.com/ProtixIT/dataclass-binder/pull/35))
 - Omit values from template that are formatted equally to the default ([#36](https://github.com/ProtixIT/dataclass-binder/pull/36))
 - Require fields with `None` in their annotation to have `None` as their default ([#37](https://github.com/ProtixIT/dataclass-binder/pull/37))
+
+### 0.3.3 - 2023-07-31:
+
+- Add `Binder.format_toml()` method to generate more compact TOML that excludes unused optional parts ([#38](https://github.com/ProtixIT/dataclass-binder/pull/38))
