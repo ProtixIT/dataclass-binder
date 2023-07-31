@@ -453,6 +453,43 @@ database-url = 'postgresql://<username>:<password>@<hostname>/<database name>'
 port = 8080
 ```
 
+### Generating a Compact Configuration File
+
+If you want to generate a fully populated configuration, you can use the `format_toml()` method.
+Compared to the template formatting, this leaves out optional parts for which no data has been provided.
+
+For example, when the following dataclass defines your configuration:
+
+```py
+@dataclass
+class Config:
+    path: str
+    """Path of input file."""
+
+    verbose: bool = False
+    """Be extra verbose in logging."""
+
+    options: dict[str, Any] = field(default_factory=dict)
+    """Various named options that are passed on to tool XYZ."""
+```
+
+This code generates a populated configuration file:
+
+```py
+config = Config(path="./data")
+
+with open("config.toml", "w") as out:
+    for line in Binder(config).format_toml():
+        print(line, file=out)
+```
+
+With the contents of `config.toml` containing only the `path` field:
+
+```toml
+# Path of input file.
+path = './data'
+```
+
 ### Troubleshooting
 
 Finally, a troubleshooting tip: instead of the full `Binder(Config).parse_toml()`, first try to execute only `Binder(Config)`.
