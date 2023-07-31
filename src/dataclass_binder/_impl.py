@@ -430,6 +430,18 @@ class Binder(Generic[T]):
         else:
             return replace(instance, **parsed)  # type: ignore[type-var]
 
+    def format_toml(self) -> Iterator[str]:
+        """
+        Yield lines of TOML text for populating the dataclass or object that we are binding to.
+
+        If we are binding to an object, non-default values from that object will be output.
+
+        If we are binding to a class, example values for mandatory fields will be derived from the field types;
+        these example values can be syntactically incorrect placeholders.
+        """
+
+        return self._format_toml_root(template=False)
+
     def format_toml_template(self) -> Iterator[str]:
         """
         Yield lines of TOML text as a template for populating the dataclass or object that we are binding to.
@@ -441,15 +453,20 @@ class Binder(Generic[T]):
         If we are binding to a class, example values will be derived from the field types.
         """
 
+        return self._format_toml_root(template=True)
+
+    def _format_toml_root(self, *, template: bool) -> Iterator[str]:
         table = Table(self, "", self._instance, None)
-        lines = table.format_table(set())
+        lines = table.format_table(set(), template=template)
         for line in lines:
             if line:
                 yield line
                 break
         yield from lines
 
-    def _format_toml_table(self, instance: T | None, defer: Callable[[Table[Any]], None]) -> Iterator[str]:
+    def _format_toml_table(
+        self, instance: T | None, defer: Callable[[Table[Any]], None], *, template: bool
+    ) -> Iterator[str]:
         dataclass = self._dataclass
         field_types = self._class_info.field_types
         docstrings = self._class_info.field_docstrings
@@ -494,7 +511,8 @@ class Binder(Generic[T]):
                             defer(Table(value_type, nested_key_fmt, nested_value, docstring))
                         continue
                     if value_type is object:  # Any
-                        defer(Table(None, key_fmt, value, docstring, optional))
+                        if template or value or default:
+                            defer(Table(None, key_fmt, value, docstring, optional))
                         continue
                 elif issubclass(origin, Sequence):
                     (value_type,) = get_args(field_type)
@@ -508,27 +526,35 @@ class Binder(Generic[T]):
                             defer(Table(binder, nested_key_fmt, nested_value, docstring, optional))
                         continue
 
-            yield ""
+            default_fmt = None if default is MISSING or default is None else format_toml_pair(key, default)
 
-            comments = [docstring]
-            if not optional or default is None:
-                fmt_default = None
-                comments.append("Optional." if default is None else "Mandatory.")
+            if value is not None:
+                value_fmt: str | None = format_toml_pair(key, value)
+                if value_fmt == default_fmt:
+                    value_fmt = None
+            elif optional:
+                value_fmt = None
             else:
-                fmt_default = format_toml_pair(key, default)
-                comments.append(f"Default:\n{fmt_default}")
-            yield from _format_comments(*comments)
+                # Make up an example value.
+                value_fmt = f"{key_fmt} = {_format_value_for_type(field_type)}"
 
-            if value is None:
-                if not optional or default is None:
-                    comment = "# " if default is None else ""
-                    key_fmt = "".join(_iter_format_key(key))
-                    value_fmt = _format_value_for_type(field_type)
-                    yield f"{comment}{key_fmt} = {value_fmt}"
-            else:
-                fmt_value = format_toml_pair(key, value)
-                if fmt_value != fmt_default:
-                    yield fmt_value
+            if template or value_fmt is not None:
+                comments = [docstring]
+                if template:
+                    if not optional:
+                        comments.append("Mandatory.")
+                    elif default_fmt is not None:
+                        comments.append(f"Default:\n{default_fmt}")
+                    elif value_fmt is not None:
+                        # We don't need an example value in the comment if we're outputting a value line.
+                        comments.append("Optional.")
+                    else:
+                        # We have no value; we do have a default but it's unformattable.
+                        comments.append(f"Optional.\n{key_fmt} = {_format_value_for_type(field_type)}")
+                yield from _format_comments(*comments, leading_newline=True)
+
+            if value_fmt is not None:
+                yield value_fmt
 
     if TYPE_CHECKING:
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
@@ -574,7 +600,7 @@ class Table(Generic[T]):
     def prefix_context(self, context: str) -> Table[T]:
         return replace(self, key_fmt=f"{context}.{self.key_fmt}" if context else self.key_fmt)
 
-    def format_table(self, inside: Set[type]) -> Iterator[str]:
+    def format_table(self, inside: Set[type], *, template: bool) -> Iterator[str]:
         """
         The `inside` parameter keeps track of which dataclasses we are currently outputting,
         to prevent infinite recursion.
@@ -583,6 +609,14 @@ class Table(Generic[T]):
         child_tables: list[Table[Any]] = []
         context = self.key_fmt
         value = self.value
+
+        if template:
+            defer = child_tables.append
+        else:
+
+            def defer(table: Table) -> None:
+                if table.value is not None or not table.optional:
+                    child_tables.append(table)
 
         if (binder := self.binder) is None:
             match value:
@@ -596,25 +630,25 @@ class Table(Generic[T]):
             content = None
         else:
             inside |= {binder._dataclass}
-            content = list(binder._format_toml_table(value, child_tables.append))
+            content = list(binder._format_toml_table(value, defer=defer, template=template))
             if not content:
                 content = None
 
         if content is not None:
             if context:
-                yield from self.format_header()
+                yield from self.format_header(template=template)
 
             yield from content
 
         for table in child_tables:
-            yield from table.prefix_context(context).format_table(inside)
+            yield from table.prefix_context(context).format_table(inside, template=template)
 
-    def format_header(self) -> Iterator[str]:
+    def format_header(self, *, template: bool) -> Iterator[str]:
         yield ""
         yield from _format_comments(
             self.class_docstring,
             self.field_docstring,
-            "Optional table." if self.optional else None,
+            "Optional table." if template and self.optional else None,
         )
         yield f"[{self.key_fmt}]"
 
@@ -712,7 +746,34 @@ def _iter_format_key(key: str) -> Iterator[str]:
     if _TOML_BARE_KEY.match(key):
         yield key
     else:
-        yield from _iter_format_value(key)
+        yield from _iter_format_string(key)
+
+
+def _iter_format_string(value: str) -> Iterator[str]:
+    # Ideally we could assume that every tool along the way defaults to UTF-8 and just output that,
+    # but I don't think we live in that world yet, so escape non-ASCII characters.
+    if value.isprintable() and value.isascii() and "'" not in value:
+        # Use a literal string if possible.
+        yield "'"
+        yield value
+        yield "'"
+    else:
+        # Use basic string otherwise.
+        yield '"'
+        for ch in value:
+            if ch.isascii():
+                try:
+                    yield _TOML_ESCAPES[ch]
+                except KeyError:
+                    if ch.isprintable():
+                        yield ch
+                    else:
+                        yield f"\\u{ord(ch):04X}"
+            elif ord(ch) < 0x10000:
+                yield f"\\u{ord(ch):04X}"
+            else:
+                yield f"\\U{ord(ch):08X}"
+        yield '"'
 
 
 def _iter_format_value(value: object) -> Iterator[str]:
@@ -722,30 +783,7 @@ def _iter_format_value(value: object) -> Iterator[str]:
         case int() | float():
             yield str(value)
         case str():
-            # Ideally we could assume that every tool along the way defaults to UTF-8 and just output that,
-            # but I don't think we live in that world yet, so escape non-ASCII characters.
-            if value.isprintable() and value.isascii() and "'" not in value:
-                # Use a literal string if possible.
-                yield "'"
-                yield value
-                yield "'"
-            else:
-                # Use basic string otherwise.
-                yield '"'
-                for ch in value:
-                    if ch.isascii():
-                        try:
-                            yield _TOML_ESCAPES[ch]
-                        except KeyError:
-                            if ch.isprintable():
-                                yield ch
-                            else:
-                                yield f"\\u{ord(ch):04X}"
-                    elif ord(ch) < 0x10000:
-                        yield f"\\u{ord(ch):04X}"
-                    else:
-                        yield f"\\U{ord(ch):08X}"
-                yield '"'
+            yield from _iter_format_string(value)
         case date() | time():
             yield value.isoformat()
         case Mapping():
@@ -772,10 +810,22 @@ def _iter_format_value(value: object) -> Iterator[str]:
             raise TypeError(type(value).__name__)
 
 
-def _format_comments(*comments: str | None) -> Iterator[str]:
+def _format_comments(*comments: str | None, leading_newline: bool = False) -> Iterator[str]:
+    """
+    Yield lines containing a formatted version of the given comments.
+
+    Comments that are None will be ignored.
+    If `leading_newline` is True, an empty ine will be output before any comment lines,
+    but only if the output is non-empty.
+    """
+
     separator = False
     for comment in comments:
         if comment:
+            if leading_newline:
+                yield ""
+                leading_newline = False
+
             contains_empty = False
             for line in comment.split("\n"):
                 if separator:

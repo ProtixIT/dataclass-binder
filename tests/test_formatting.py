@@ -630,13 +630,17 @@ def test_format_template_valid_value(*, field_type: type[Any], optional: bool, s
 class MiddleConfig:
     """This docstring will remain invisible, as its table is empty."""
 
-    deepest: NestedConfig
+    deepest: NestedConfig | None = None
 
 
 @dataclass(kw_only=True)
 class PopulatedConfig:
     source_database_connection_url: str
+    """Database to read the data from."""
+
     destination_database_connection_url: str = "sqlite://"
+    """Database to write the data to."""
+
     middle: MiddleConfig
     webhook_urls: tuple[str, ...] = ()
 
@@ -651,9 +655,11 @@ def test_format_template_populated() -> None:
     template = "\n".join(Binder(config).format_toml_template())
     assert template == (
         """
+# Database to read the data from.
 # Mandatory.
 source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/<database name>'
 
+# Database to write the data to.
 # Default:
 # destination-database-connection-url = 'sqlite://'
 
@@ -662,6 +668,7 @@ source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/
 webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
 
 # This table is bound to a nested dataclass.
+# Optional table.
 [middle.deepest]
 
 # Mandatory.
@@ -677,6 +684,53 @@ inner-str = 'foo'
 # with-default = 'n/a'
 """.strip()
     )
+
+
+def test_format_populated() -> None:
+    config = PopulatedConfig(
+        source_database_connection_url="postgresql://<username>:<password>@<hostname>/<database name>",
+        destination_database_connection_url="sqlite://",
+        middle=MiddleConfig(NestedConfig(5, "foo")),
+        webhook_urls=("https://host1/refresh", "https://host2/refresh"),
+    )
+    template = "\n".join(Binder(config).format_toml())
+    assert template == (
+        """
+# Database to read the data from.
+source-database-connection-url = 'postgresql://<username>:<password>@<hostname>/<database name>'
+webhook-urls = ['https://host1/refresh', 'https://host2/refresh']
+
+# This table is bound to a nested dataclass.
+[middle.deepest]
+inner-int = 5
+inner-str = 'foo'
+""".strip()
+    )
+
+
+def test_format_optional_tables() -> None:
+    """Optional tables must be omitted during non-template formatting."""
+
+    @dataclass
+    class Config:
+        untyped_mandatory: dict[str, Any]
+        """This is the docstring for the mandatory untyped field."""
+
+        untyped_optional: dict[str, Any] = field(default_factory=dict)
+        """This is the docstring for the optional untyped field."""
+
+        nested: NestedConfig | None = None
+        """Optional nested dataclass."""
+
+    expected = """
+# This is the docstring for the mandatory untyped field.
+[untyped-mandatory]
+""".strip()
+
+    assert "\n".join(Binder(Config).format_toml()) == expected
+
+    config = Config(untyped_mandatory={})
+    assert "\n".join(Binder(config).format_toml()) == expected
 
 
 @dataclass
