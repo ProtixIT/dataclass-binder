@@ -428,7 +428,7 @@ class Binder(Generic[T]):
         if instance is None:
             return self._dataclass(**parsed)
         else:
-            return replace(instance, **parsed)  # type: ignore[type-var]
+            return replace(instance, **parsed)  # type: ignore[type-var, misc]
 
     def format_toml(self) -> Iterator[str]:
         """
