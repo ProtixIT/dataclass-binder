@@ -49,7 +49,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
             return object
         elif not isinstance(field_type, type):
             raise TypeError(f"Annotation for field '{context}' is not a type")
-        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType):
+        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType | Path):
             return field_type
         elif field_type is type:
             # https://github.com/python/mypy/issues/13026
@@ -310,6 +310,10 @@ class Binder(Generic[T]):
                     )
                 else:
                     raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected time")
+            elif issubclass(field_type, Path):
+                if not isinstance(value, str):
+                    raise TypeError(f"Expected TOML string for path '{context}', got '{type(value).__name__}'")
+                return field_type(value)
             elif isinstance(value, field_type) and (
                 type(value) is not bool or field_type is bool or field_type is object
             ):
@@ -664,7 +668,7 @@ def format_toml_pair(key: str, value: object) -> str:
 def _to_toml_pair(value: object) -> tuple[str | None, Any]:
     """Return a TOML-compatible suffix and value pair with the data from the given rich value object."""
     match value:
-        case str() | int() | float() | date() | time():  # note: 'bool' is a subclass of 'int'
+        case str() | int() | float() | date() | time() | Path():  # note: 'bool' is a subclass of 'int'
             return None, value
         case timedelta():
             if value.days == 0:
@@ -784,6 +788,8 @@ def _iter_format_value(value: object) -> Iterator[str]:
             yield str(value)
         case str():
             yield from _iter_format_string(value)
+        case Path():
+            yield from _iter_format_string(str(value))
         case date() | time():
             yield value.isoformat()
         case Mapping():

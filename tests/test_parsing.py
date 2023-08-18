@@ -730,6 +730,20 @@ def test_bind_unknown_suffix() -> None:
         Binder(TimeDeltaConfig).parse_toml(stream)
 
 
+def test_bind_path_nonstring() -> None:
+    """TypeError is raised when a path value is not a TOML string."""
+
+    @dataclass
+    class Config:
+        path: Path
+
+    with (
+        stream_text("path = 8.3") as stream,
+        pytest.raises(TypeError, match=r"^Expected TOML string for path 'Config.path', got 'float'$"),
+    ):
+        Binder(Config).parse_toml(stream)
+
+
 @dataclass(frozen=True)
 class ClassRefConfig:
     first_class: type

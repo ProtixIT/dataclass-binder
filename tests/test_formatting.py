@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
+from pathlib import Path
 from types import ModuleType, NoneType, UnionType
 from typing import Any, TypeVar, Union, cast, get_args, get_origin
 
@@ -135,6 +136,14 @@ def test_format_value_round_trip_exact(*, value: object, optional: bool, string:
 @pytest.mark.parametrize("string", (True, False))
 def test_format_value_round_trip_any(*, value: object, optional: bool, string: bool) -> None:
     dc = single_value_dataclass(Any, optional=optional, string=string)
+    assert round_trip_value(value, dc) == value
+
+
+@pytest.mark.parametrize("optional", (True, False))
+@pytest.mark.parametrize("string", (True, False))
+def test_format_value_path(*, optional: bool, string: bool) -> None:
+    value = Path("/var/log/lumberjack/")
+    dc = single_value_dataclass(Path, optional=optional, string=string)
     assert round_trip_value(value, dc) == value
 
 
