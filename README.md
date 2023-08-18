@@ -202,7 +202,7 @@ class Config:
     log_dir: Path
 
     def create_log_dir(self) -> None:
-        log_dir.mkdir(parents=True)
+        self.log_dir.mkdir(parents=True)
 ```
 
 ### Dates and Times
