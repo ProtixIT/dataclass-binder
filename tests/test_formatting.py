@@ -290,6 +290,8 @@ class TemplateConfig:
 
     expiry: timedelta
 
+    certificate: Path
+
     multi_type: str | int
 
     derived: int = field(init=False)
@@ -334,6 +336,9 @@ module = 'fully.qualified.module.name'
 expiry = 00:00:00
 
 # Mandatory.
+certificate = '/path/to/dir_or_file'
+
+# Mandatory.
 multi-type = '???' | 0
 """.strip()
     )
@@ -355,11 +360,25 @@ def test_format_dataclass_inline(*, optional: bool, string: bool) -> None:
     We prefer to format dataclasses as full (non-inline) tables, but sometimes we must format them inline,
     for example when they share an array with non-table values.
     """
-    value = TemplateConfig(happiness="easy", flag=True, module=example, expiry=timedelta(days=3), multi_type=-1)
+    value = TemplateConfig(
+        happiness="easy",
+        flag=True,
+        module=example,
+        expiry=timedelta(days=3),
+        certificate=Path("secrets/copper.key"),
+        multi_type=-1,
+    )
     formatted = format_toml_pair("value", value)
     assert formatted == (
-        "value = {happiness = 'easy', flag = true, module = 'tests.example', "
-        "number = 123, another-number = 0.5, expiry-days = 3, multi-type = -1}"
+        "value = {"
+        "happiness = 'easy', "
+        "flag = true, "
+        "module = 'tests.example', "
+        "number = 123, "
+        "another-number = 0.5, "
+        "expiry-days = 3, "
+        "certificate = 'secrets/copper.key', "
+        "multi-type = -1}"
     )
     dc = single_value_dataclass(TemplateConfig, optional=optional, string=string)
     assert parse_toml(dc, formatted).value == value

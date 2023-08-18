@@ -893,6 +893,8 @@ def _format_value_for_type(field_type: type[Any]) -> str:
             return "0"
         elif field_type is float:
             return "0.0"
+        elif field_type is Path:
+            return "'/path/to/dir_or_file'"
         elif field_type is ModuleType:
             return "'fully.qualified.module.name'"
         elif field_type is datetime:
