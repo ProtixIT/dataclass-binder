@@ -189,6 +189,22 @@ class Config:
     port: int
 ```
 
+### File System Paths
+
+While you can of course store file system paths as strings, [pathlib](https://docs.python.org/3/library/pathlib.html) offers a nicer API for them.
+To take advantage of this, annotate the field as `Path`:
+
+```py
+from pathlib import Path
+
+@dataclass
+class Config:
+    log_dir: Path
+
+    def create_log_dir(self) -> None:
+        log_dir.mkdir(parents=True)
+```
+
 ### Dates and Times
 
 TOML handles dates and timestamps as first-class values.
@@ -578,3 +594,7 @@ In version 0.3.0, the function `format_template()` has been replaced by the meth
 ### 0.3.3 - 2023-07-31:
 
 - Add `Binder.format_toml()` method to generate more compact TOML that excludes unused optional parts ([#38](https://github.com/ProtixIT/dataclass-binder/pull/38))
+
+### 0.3.4 - 2023-08-18:
+
+- Support `pathlib.Path` as a field annotation ([#40](https://github.com/ProtixIT/dataclass-binder/issues/40))

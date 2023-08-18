@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
+from pathlib import Path
 from types import ModuleType, NoneType, UnionType
 from typing import Any, TypeVar, Union, cast, get_args, get_origin
 
@@ -135,6 +136,14 @@ def test_format_value_round_trip_exact(*, value: object, optional: bool, string:
 @pytest.mark.parametrize("string", (True, False))
 def test_format_value_round_trip_any(*, value: object, optional: bool, string: bool) -> None:
     dc = single_value_dataclass(Any, optional=optional, string=string)
+    assert round_trip_value(value, dc) == value
+
+
+@pytest.mark.parametrize("optional", (True, False))
+@pytest.mark.parametrize("string", (True, False))
+def test_format_value_path(*, optional: bool, string: bool) -> None:
+    value = Path("/var/log/lumberjack/")
+    dc = single_value_dataclass(Path, optional=optional, string=string)
     assert round_trip_value(value, dc) == value
 
 
@@ -281,6 +290,8 @@ class TemplateConfig:
 
     expiry: timedelta
 
+    certificate: Path
+
     multi_type: str | int
 
     derived: int = field(init=False)
@@ -325,6 +336,9 @@ module = 'fully.qualified.module.name'
 expiry = 00:00:00
 
 # Mandatory.
+certificate = '/path/to/dir_or_file'
+
+# Mandatory.
 multi-type = '???' | 0
 """.strip()
     )
@@ -346,11 +360,25 @@ def test_format_dataclass_inline(*, optional: bool, string: bool) -> None:
     We prefer to format dataclasses as full (non-inline) tables, but sometimes we must format them inline,
     for example when they share an array with non-table values.
     """
-    value = TemplateConfig(happiness="easy", flag=True, module=example, expiry=timedelta(days=3), multi_type=-1)
+    value = TemplateConfig(
+        happiness="easy",
+        flag=True,
+        module=example,
+        expiry=timedelta(days=3),
+        certificate=Path("secrets/copper.key"),
+        multi_type=-1,
+    )
     formatted = format_toml_pair("value", value)
     assert formatted == (
-        "value = {happiness = 'easy', flag = true, module = 'tests.example', "
-        "number = 123, another-number = 0.5, expiry-days = 3, multi-type = -1}"
+        "value = {"
+        "happiness = 'easy', "
+        "flag = true, "
+        "module = 'tests.example', "
+        "number = 123, "
+        "another-number = 0.5, "
+        "expiry-days = 3, "
+        "certificate = 'secrets/copper.key', "
+        "multi-type = -1}"
     )
     dc = single_value_dataclass(TemplateConfig, optional=optional, string=string)
     assert parse_toml(dc, formatted).value == value
