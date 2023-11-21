@@ -871,7 +871,7 @@ class IssueStatus(Enum):
 def test_format_with_enums() -> None:
     @dataclass
     class Issue:
-        id: int
+        issue_id: int
         title: str
         status: IssueStatus
 
@@ -880,7 +880,7 @@ def test_format_with_enums() -> None:
     template = "\n".join(Binder(issue).format_toml())
 
     assert template == """
-id = 1
+issue-id = 1
 title = 'Test'
 status = 'open'
 """.strip()
