@@ -862,55 +862,25 @@ value = 0
     )
 
 
-class Color(Enum):
-    RED = "red"
-    BLUE = "blue"
-    GREEN = "green"
+class IssueStatus(Enum):
+    OPEN = "open"
+    REJECTED = "rejected"
+    COMPLETED = "completed"
 
-class Number(Enum):
-    ONE = 1
-    TWO = 2
-    THREE = 3
 
-@dataclass
-class EnumEntry:
-    name: str
-    color: Color
-    number: Number
-
-def test_enums() -> None:
+def test_format_with_enums() -> None:
     @dataclass
-    class Config:
-        best_colors: list[Color]
-        best_numbers: list[Number]
-        entries: list[EnumEntry]
+    class Issue:
+        id: int
+        title: str
+        status: IssueStatus
 
-    with stream_text(
-        """
-        best-colors = ["red", "green", "blue"]
-        best-numbers = [1, 2, 3]
+    issue = Issue(1, "Test", IssueStatus.OPEN)
 
-        [[entries]]
-        name = "Entry 1"
-        color = "blue"
-        number = 2
+    template = "\n".join(Binder(issue).format_toml())
 
-        [[entries]]
-        name = "Entry 2"
-        color = "red"
-        number = 1
-        """
-    ) as stream:
-        config = Binder(Config).parse_toml(stream)
-
-    assert len(config.best_colors) == 3
-    assert len(config.best_numbers) == 3
-    assert config.best_colors.index(Color.RED) == 0
-    assert config.best_colors.index(Color.GREEN) == 1
-    assert config.best_colors.index(Color.BLUE) == 2
-    assert all(num in config.best_numbers for num in Number)
-    assert len(config.entries) == 2
-    assert config.entries[0].color == Color.BLUE
-    assert config.entries[0].number == Number.TWO
-    assert config.entries[1].color == Color.RED
-    assert config.entries[1].number == Number.ONE
+    assert template == """
+id = 1
+title = 'Test'
+status = 'open'
+""".strip()
