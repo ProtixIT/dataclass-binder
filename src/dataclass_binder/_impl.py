@@ -19,6 +19,7 @@ from collections.abc import (
 )
 from dataclasses import MISSING, Field, asdict, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
+from enum import Enum
 from functools import reduce
 from importlib import import_module
 from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
@@ -49,7 +50,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
             return object
         elif not isinstance(field_type, type):
             raise TypeError(f"Annotation for field '{context}' is not a type")
-        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType | Path):
+        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType | Path | Enum):
             return field_type
         elif field_type is type:
             # https://github.com/python/mypy/issues/13026
@@ -313,6 +314,8 @@ class Binder(Generic[T]):
             elif issubclass(field_type, Path):
                 if not isinstance(value, str):
                     raise TypeError(f"Expected TOML string for path '{context}', got '{type(value).__name__}'")
+                return field_type(value)
+            elif issubclass(field_type, Enum):
                 return field_type(value)
             elif isinstance(value, field_type) and (
                 type(value) is not bool or field_type is bool or field_type is object
@@ -697,6 +700,8 @@ def _to_toml_pair(value: object) -> tuple[str | None, Any]:
                     return "-weeks", days // 7
                 else:
                     return "-days", days
+        case Enum():
+            return None, value.value
         case ModuleType():
             return None, value.__name__
         case Mapping():
