@@ -879,8 +879,10 @@ def test_format_with_enums() -> None:
 
     template = "\n".join(Binder(issue).format_toml())
 
-    assert template == """
+    assert template == (
+        """
 issue-id = 1
 title = 'Test'
 status = 'open'
 """.strip()
+    )
