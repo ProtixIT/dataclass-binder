@@ -5,7 +5,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, dataclass, field
 from datetime import date, datetime, time, timedelta
-from enum import Enum
+from enum import Enum, IntEnum
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType
@@ -1088,12 +1088,12 @@ def test_bind_merge() -> None:
 
 
 class Color(Enum):
-    RED = "red"
-    BLUE = "blue"
-    GREEN = "green"
+    RED = "#FF0000"
+    GREEN = "#00FF00"
+    BLUE = "#0000FF"
 
 
-class Number(Enum):
+class Number(IntEnum):
     ONE = 1
     TWO = 2
     THREE = 3
@@ -1138,7 +1138,7 @@ def test_enums() -> None:
     assert config.best_colors.index(Color.BLUE) == 2
     assert all(num in config.best_numbers for num in Number)
     assert len(config.entries) == 2
-    assert config.entries[0].color == Color.BLUE
-    assert config.entries[0].number == Number.TWO
-    assert config.entries[1].color == Color.RED
-    assert config.entries[1].number == Number.ONE
+    assert config.entries[0].color is Color.BLUE
+    assert config.entries[0].number is Number.TWO
+    assert config.entries[1].color is Color.RED
+    assert config.entries[1].number is Number.ONE

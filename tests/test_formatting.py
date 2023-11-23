@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
-from enum import Enum
+from enum import Enum, auto, IntEnum
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType, NoneType, UnionType
@@ -862,27 +862,33 @@ value = 0
     )
 
 
-class IssueStatus(Enum):
-    OPEN = "open"
-    REJECTED = "rejected"
-    COMPLETED = "completed"
+class Verbosity(Enum):
+    QUIET = auto()
+    NORMAL = auto()
+    DETAILED = auto()
+
+
+class IntVerbosity(IntEnum):
+    QUIET = 0
+    NORMAL = 1
+    DETAILED = 2
 
 
 def test_format_with_enums() -> None:
     @dataclass
-    class Issue:
-        issue_id: int
-        title: str
-        status: IssueStatus
+    class Log:
+        message: str
+        verbosity: Verbosity
+        verbosity_level: IntVerbosity
 
-    issue = Issue(1, "Test", IssueStatus.OPEN)
+    log = Log("Hello, World", Verbosity.DETAILED, IntVerbosity.DETAILED)
 
-    template = "\n".join(Binder(issue).format_toml())
+    template = "\n".join(Binder(log).format_toml())
 
     assert template == (
         """
-issue-id = 1
-title = 'Test'
-status = 'open'
+message = "Hello, World"
+verbosity = "detailed"
+verbosity-evel = 2
 """.strip()
     )

@@ -210,7 +210,6 @@ T = TypeVar("T")
 
 @dataclass(slots=True)
 class _ClassInfo(Generic[T]):
-
     _cache: ClassVar[MutableMapping[type[Any], _ClassInfo[Any]]] = WeakKeyDictionary()
 
     dataclass: type[T]
