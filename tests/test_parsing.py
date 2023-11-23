@@ -1144,6 +1144,42 @@ def test_enums() -> None:
     assert config.entries[1].number is Number.ONE
 
 
+def test_enum_with_invalid_value() -> None:
+    @dataclass
+    class UserFavorites:
+        favorite_number: Number
+        favorite_color: Color
+
+    with stream_text(
+        """
+        favorite-number = "one"
+        favorite-color = "red"
+        """
+    ) as stream, pytest.raises(ValueError):  # noqa: PT011
+        Binder(UserFavorites).parse_toml(stream)
+
+
+def test_enum_keys_being_case_insensitive() -> None:
+    @dataclass
+    class Theme:
+        primary: Color
+        secondary: Color
+        accent: Color
+
+    with stream_text(
+        """
+        primary = "RED"
+        secondary = "green"
+        accent = "blUE"
+        """
+    ) as stream:
+        theme = Binder(Theme).parse_toml(stream)
+
+    assert theme.primary is Color.RED
+    assert theme.secondary is Color.GREEN
+    assert theme.accent is Color.BLUE
+
+
 def test_key_based_enum_while_using_value_ident() -> None:
     @dataclass
     class UserColorPreference:
@@ -1152,9 +1188,8 @@ def test_key_based_enum_while_using_value_ident() -> None:
 
     with stream_text(
         """
-            primary = "#FF0000"
-            seconadry = "blue"
-            """
-    ) as stream:
-        with pytest.raises(TypeError):
-            Binder(UserColorPreference).parse_toml(stream)
+        primary = "#FF0000"
+        seconadry = "blue"
+        """
+    ) as stream, pytest.raises(TypeError):
+        Binder(UserColorPreference).parse_toml(stream)
