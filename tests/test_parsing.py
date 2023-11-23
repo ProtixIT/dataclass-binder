@@ -1142,3 +1142,19 @@ def test_enums() -> None:
     assert config.entries[0].number is Number.TWO
     assert config.entries[1].color is Color.RED
     assert config.entries[1].number is Number.ONE
+
+
+def test_key_based_enum_while_using_value_ident() -> None:
+    @dataclass
+    class UserColorPreference:
+        primary: Color
+        secondary: Color
+
+    with stream_text(
+        """
+            primary = "#FF0000"
+            seconadry = "blue"
+            """
+    ) as stream:
+        with pytest.raises(TypeError):
+            Binder(UserColorPreference).parse_toml(stream)

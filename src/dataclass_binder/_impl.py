@@ -19,7 +19,7 @@ from collections.abc import (
 )
 from dataclasses import MISSING, Field, asdict, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
-from enum import Enum
+from enum import Enum, ReprEnum
 from functools import reduce
 from importlib import import_module
 from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
@@ -50,7 +50,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
             return object
         elif not isinstance(field_type, type):
             raise TypeError(f"Annotation for field '{context}' is not a type")
-        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType | Path | Enum):
+        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType | Path | Enum | ReprEnum):
             return field_type
         elif field_type is type:
             # https://github.com/python/mypy/issues/13026
@@ -314,8 +314,15 @@ class Binder(Generic[T]):
                 if not isinstance(value, str):
                     raise TypeError(f"Expected TOML string for path '{context}', got '{type(value).__name__}'")
                 return field_type(value)
-            elif issubclass(field_type, Enum):
+            elif issubclass(field_type, ReprEnum):
                 return field_type(value)
+            elif issubclass(field_type, Enum):
+                if not isinstance(value, str):
+                    raise TypeError(f"'{value}' is not a valid key for enum '{field_type}', must be of type str")
+                for enum_value in field_type:
+                    if enum_value.name.lower() == value.lower():
+                        return enum_value
+                raise TypeError(f"'{value}' is not a valid key for enum '{field_type}', could not be found")
             elif isinstance(value, field_type) and (
                 type(value) is not bool or field_type is bool or field_type is object
             ):
@@ -700,6 +707,8 @@ def _to_toml_pair(value: object) -> tuple[str | None, Any]:
                 else:
                     return "-days", days
         case Enum():
+            return None, value.name.lower()
+        case ReprEnum():
             return None, value.value
         case ModuleType():
             return None, value.__name__

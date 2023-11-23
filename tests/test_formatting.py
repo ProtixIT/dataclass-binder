@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
-from enum import Enum, auto, IntEnum
+from enum import Enum, IntEnum, auto
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType, NoneType, UnionType
@@ -887,8 +887,8 @@ def test_format_with_enums() -> None:
 
     assert template == (
         """
-message = "Hello, World"
-verbosity = "detailed"
-verbosity-evel = 2
+message = 'Hello, World'
+verbosity = 'detailed'
+verbosity-level = 2
 """.strip()
     )
