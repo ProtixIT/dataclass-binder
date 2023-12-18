@@ -1099,6 +1099,16 @@ class Number(IntEnum):
     THREE = 3
 
 
+class Weekday(Enum):
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THURSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
+
 @dataclass
 class EnumEntry:
     name: str
@@ -1193,3 +1203,26 @@ def test_key_based_enum_while_using_value_ident() -> None:
         """
     ) as stream, pytest.raises(TypeError):
         Binder(UserColorPreference).parse_toml(stream)
+
+
+def test_enum_parsing_with_invalid_key_type() -> None:
+    @dataclass
+    class UserPrefs:
+        name: str
+        start_of_the_week: Weekday
+
+    with stream_text(
+        """
+        name = "Peter Testuser"
+        start-of-the-week = "sunday"
+        """
+    ) as stream:
+        Binder(UserPrefs).parse_toml(stream)
+
+    with stream_text(
+        """
+        name = "Peter Testuser"
+        start-of-the-week = 1
+        """
+    ) as stream, pytest.raises(TypeError):
+        Binder(UserPrefs).parse_toml(stream)
