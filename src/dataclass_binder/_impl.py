@@ -19,7 +19,7 @@ from collections.abc import (
 )
 from dataclasses import MISSING, Field, asdict, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
-from enum import Enum, ReprEnum
+from enum import Enum
 from functools import reduce
 from importlib import import_module
 from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
@@ -31,7 +31,19 @@ from weakref import WeakKeyDictionary
 
 if sys.version_info < (3, 11):
     import tomli as tomllib  # pragma: no cover
+
+    if TYPE_CHECKING:
+
+        class ReprEnum(Enum):
+            ...
+
+    else:
+        from enum import IntEnum, IntFlag
+
+        ReprEnum = IntEnum | IntFlag
 else:
+    from enum import ReprEnum
+
     import tomllib  # pragma: no cover
 
 
@@ -707,9 +719,10 @@ def _to_toml_pair(value: object) -> tuple[str | None, Any]:
                 else:
                     return "-days", days
         case Enum():
-            return None, value.name.lower()
-        case ReprEnum():
-            return None, value.value
+            if isinstance(value, ReprEnum):
+                return None, value.value
+            else:
+                return None, value.name.lower()
         case ModuleType():
             return None, value.__name__
         case Mapping():
