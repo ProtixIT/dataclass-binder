@@ -689,6 +689,13 @@ def format_toml_pair(key: str, value: object) -> str:
 def _to_toml_pair(value: object) -> tuple[str | None, Any]:
     """Return a TOML-compatible suffix and value pair with the data from the given rich value object."""
     match value:
+        # enums have to be checked before basic types because for instance
+        # IntEnum is also of type int
+        case Enum():
+            if isinstance(value, ReprEnum):
+                return None, value.value
+            else:
+                return None, value.name.lower()
         case str() | int() | float() | date() | time() | Path():  # note: 'bool' is a subclass of 'int'
             return None, value
         case timedelta():
@@ -718,11 +725,6 @@ def _to_toml_pair(value: object) -> tuple[str | None, Any]:
                     return "-weeks", days // 7
                 else:
                     return "-days", days
-        case Enum():
-            if isinstance(value, ReprEnum):
-                return None, value.value
-            else:
-                return None, value.name.lower()
         case ModuleType():
             return None, value.__name__
         case Mapping():
