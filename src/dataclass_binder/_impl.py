@@ -29,8 +29,8 @@ from types import MappingProxyType, ModuleType, NoneType, UnionType
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin, overload
 from weakref import WeakKeyDictionary
 
-if sys.version_info < (3, 11):
-    import tomli as tomllib  # pragma: no cover
+if sys.version_info < (3, 11):  # pragma: no cover
+    import tomli as tomllib
 
     if TYPE_CHECKING:
 
@@ -41,10 +41,9 @@ if sys.version_info < (3, 11):
         from enum import IntEnum, IntFlag
 
         ReprEnum = IntEnum | IntFlag
-else:
+else:  # pragma: no cover
+    import tomllib  # noqa: I001
     from enum import ReprEnum
-
-    import tomllib  # pragma: no cover
 
 
 def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
