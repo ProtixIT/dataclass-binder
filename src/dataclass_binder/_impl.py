@@ -65,7 +65,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
             return field_type
         elif field_type is type:
             # https://github.com/python/mypy/issues/13026
-            return cast(type, type[Any])  # type: ignore[index]
+            return cast(type, type[Any])  # type: ignore[misc]
         elif hasattr(field_type, "__class_getitem__"):
             raise TypeError(f"Field '{context}' needs type argument(s)")
         else:
@@ -112,13 +112,13 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
             raise TypeError(f"type[...] annotation for '{context}' must have exactly one type argument") from None
         bases = get_args(arg) if get_origin(arg) in (UnionType, Union) else (arg,)
         if Any in bases:
-            return cast(type, type[Any])  # type: ignore[index]
+            return cast(type, type[Any])  # type: ignore[misc]
         # Convert 'type[A | B]' to 'type[A] | type[B]'.
         collected_types = []
         for base in bases:
             if not isinstance(base, type):
                 raise TypeError(f"type[...] annotation for '{context}' must have a type as its argument")
-            collected_types.append(type[base])  # type: ignore[index]
+            collected_types.append(type[base])  # type: ignore[misc]
         return reduce(operator.__or__, collected_types)
     else:
         raise TypeError(f"Field '{context}' has unsupported generic type '{origin.__name__}'")
@@ -452,7 +452,7 @@ class Binder(Generic[T]):
         if instance is None:
             return self._dataclass(**parsed)
         else:
-            return replace(instance, **parsed)  # type: ignore[type-var, misc]
+            return replace(instance, **parsed)  # type: ignore[type-var]
 
     def format_toml(self) -> Iterator[str]:
         """
