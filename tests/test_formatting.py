@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from enum import Enum, IntEnum, auto
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType, NoneType, UnionType
@@ -857,5 +858,37 @@ def test_format_template_no_module(sourceless_class: type[Any]) -> None:
         """
 # Mandatory.
 value = 0
+""".strip()
+    )
+
+
+class Verbosity(Enum):
+    QUIET = auto()
+    NORMAL = auto()
+    DETAILED = auto()
+
+
+class IntVerbosity(IntEnum):
+    QUIET = 0
+    NORMAL = 1
+    DETAILED = 2
+
+
+def test_format_with_enums() -> None:
+    @dataclass
+    class Log:
+        message: str
+        verbosity: Verbosity
+        verbosity_level: IntVerbosity
+
+    log = Log("Hello, World", Verbosity.DETAILED, IntVerbosity.DETAILED)
+
+    template = "\n".join(Binder(log).format_toml())
+
+    assert template == (
+        """
+message = 'Hello, World'
+verbosity = 'detailed'
+verbosity-level = 2
 """.strip()
     )
