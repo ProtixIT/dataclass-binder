@@ -1165,7 +1165,7 @@ def test_enum_with_invalid_value() -> None:
         favorite-number = "one"
         favorite-color = "red"
         """
-    ) as stream, pytest.raises(ValueError):  # noqa: PT011
+    ) as stream, pytest.raises(TypeError):
         Binder(UserFavorites).parse_toml(stream)
 
 
