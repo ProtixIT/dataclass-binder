@@ -58,7 +58,7 @@ jobs:
         env:
           COVERAGE_FILE: ".coverage.${{ matrix.python-version }}"
       - name: Upload coverage data
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-data
           path: .coverage.${{ matrix.python-version }}
@@ -105,7 +105,7 @@ jobs:
       - name: Fail if coverage is not 100%
         run: poetry run coverage report --fail-under=100
       - name: Upload HTML report if check failed.
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: htmlcov
