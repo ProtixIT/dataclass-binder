@@ -52,8 +52,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
         elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType | Path):
             return field_type
         elif field_type is type:
-            # https://github.com/python/mypy/issues/13026
-            return cast(type, type[Any])  # type: ignore[misc]
+            return cast(type, type[Any])
         elif hasattr(field_type, "__class_getitem__"):
             raise TypeError(f"Field '{context}' needs type argument(s)")
         else:
@@ -100,13 +99,13 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
             raise TypeError(f"type[...] annotation for '{context}' must have exactly one type argument") from None
         bases = get_args(arg) if get_origin(arg) in (UnionType, Union) else (arg,)
         if Any in bases:
-            return cast(type, type[Any])  # type: ignore[misc]
+            return cast(type, type[Any])
         # Convert 'type[A | B]' to 'type[A] | type[B]'.
         collected_types = []
         for base in bases:
             if not isinstance(base, type):
                 raise TypeError(f"type[...] annotation for '{context}' must have a type as its argument")
-            collected_types.append(type[base])  # type: ignore[misc]
+            collected_types.append(type[base])
         return reduce(operator.__or__, collected_types)
     else:
         raise TypeError(f"Field '{context}' has unsupported generic type '{origin.__name__}'")
