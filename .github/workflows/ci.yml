@@ -60,7 +60,7 @@ jobs:
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-data
+          name: coverage-data-${{ matrix.python-version }}
           path: coverage-data.${{ matrix.python-version }}
           retention-days: 7
 
@@ -97,7 +97,7 @@ jobs:
       - name: Download coverage data.
         uses: actions/download-artifact@v4
         with:
-          name: coverage-data
+          name: coverage-data-*
       - name: Combine coverage data
         run: poetry run coverage combine
         env:
