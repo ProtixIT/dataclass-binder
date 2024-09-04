@@ -56,12 +56,12 @@ jobs:
       - name: Run unit tests
         run: poetry run pytest --cov=. --cov-config=pyproject.toml
         env:
-          COVERAGE_FILE: ".coverage.${{ matrix.python-version }}"
+          COVERAGE_FILE: "coverage-data.${{ matrix.python-version }}"
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data
-          path: .coverage.${{ matrix.python-version }}
+          path: coverage-data.${{ matrix.python-version }}
           retention-days: 7
 
   coverage:
@@ -100,6 +100,8 @@ jobs:
           name: coverage-data
       - name: Combine coverage data
         run: poetry run coverage combine
+        env:
+          COVERAGE_FILE: "coverage-data"
       - name: Generate HTML coverage report
         run: poetry run coverage html --skip-covered --skip-empty
       - name: Fail if coverage is not 100%
