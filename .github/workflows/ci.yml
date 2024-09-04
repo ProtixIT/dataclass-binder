@@ -95,7 +95,7 @@ jobs:
       - name: Install coverage tool
         run: poetry install --only=coverage
       - name: Download coverage data.
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: coverage-data
       - name: Combine coverage data
