@@ -105,8 +105,12 @@ jobs:
           COVERAGE_FILE: "coverage-data"
       - name: Generate HTML coverage report
         run: poetry run coverage html --skip-covered --skip-empty
+        env:
+          COVERAGE_FILE: "coverage-data"
       - name: Fail if coverage is not 100%
         run: poetry run coverage report --fail-under=100
+        env:
+          COVERAGE_FILE: "coverage-data"
       - name: Upload HTML report if check failed.
         uses: actions/upload-artifact@v4
         with:
