@@ -34,6 +34,9 @@ else:
     import tomllib  # pragma: no cover
 
 
+# Note: Actually 'field_type' can either be a type of a typing special form,
+#       but there is no way yet to annotate typing special forms.
+#       This is the source of a lot of the casts and suppressions in this function.
 def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
     """
     Verify and streamline a type annotation.
@@ -45,7 +48,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
     """
     origin = get_origin(field_type)
     if origin is None:
-        if field_type is Any:
+        if field_type is Any:  # type: ignore[comparison-overlap]
             return object
         elif not isinstance(field_type, type):
             raise TypeError(f"Annotation for field '{context}' is not a type")
@@ -105,7 +108,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
         for base in bases:
             if not isinstance(base, type):
                 raise TypeError(f"type[...] annotation for '{context}' must have a type as its argument")
-            collected_types.append(type[base])
+            collected_types.append(cast(type[Any], type[base]))
         return reduce(operator.__or__, collected_types)
     else:
         raise TypeError(f"Field '{context}' has unsupported generic type '{origin.__name__}'")
