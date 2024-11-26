@@ -19,6 +19,7 @@ from collections.abc import (
 )
 from dataclasses import MISSING, Field, asdict, dataclass, fields, is_dataclass, replace
 from datetime import date, datetime, time, timedelta
+from enum import Enum
 from functools import reduce
 from importlib import import_module
 from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
@@ -28,10 +29,21 @@ from types import MappingProxyType, ModuleType, NoneType, UnionType
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin, overload
 from weakref import WeakKeyDictionary
 
-if sys.version_info < (3, 11):
-    import tomli as tomllib  # pragma: no cover
-else:
-    import tomllib  # pragma: no cover
+if sys.version_info < (3, 11):  # pragma: no cover
+    import tomli as tomllib
+
+    if TYPE_CHECKING:
+
+        class ReprEnum(Enum):
+            ...
+
+    else:
+        from enum import IntEnum, IntFlag
+
+        ReprEnum = IntEnum | IntFlag
+else:  # pragma: no cover
+    import tomllib  # noqa: I001
+    from enum import ReprEnum
 
 
 # Note: Actually 'field_type' can either be a type of a typing special form,
@@ -52,7 +64,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
             return object
         elif not isinstance(field_type, type):
             raise TypeError(f"Annotation for field '{context}' is not a type")
-        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType | Path):
+        elif issubclass(field_type, str | int | float | date | time | timedelta | ModuleType | Path | Enum):
             return field_type
         elif field_type is type:
             return cast(type, type[Any])
@@ -211,7 +223,6 @@ T = TypeVar("T")
 
 @dataclass(slots=True)
 class _ClassInfo(Generic[T]):
-
     _cache: ClassVar[MutableMapping[type[Any], _ClassInfo[Any]]] = WeakKeyDictionary()
 
     dataclass: type[T]
@@ -316,6 +327,24 @@ class Binder(Generic[T]):
                 if not isinstance(value, str):
                     raise TypeError(f"Expected TOML string for path '{context}', got '{type(value).__name__}'")
                 return field_type(value)
+            elif issubclass(field_type, ReprEnum):
+                if issubclass(field_type, int) and not isinstance(value, int):
+                    raise TypeError(f"Value for '{context}': '{value}' is not of type int")
+                if issubclass(field_type, str) and not isinstance(value, str):
+                    raise TypeError(f"Value for '{context}': '{value}' is not of type str")
+                return field_type(value)
+            elif issubclass(field_type, Enum):
+                if not isinstance(value, str):
+                    raise TypeError(
+                        f"Value for '{context}': '{value}' is not a valid key for enum '{field_type}', "
+                        f"must be of type str"
+                    )
+                for enum_value in field_type:
+                    if enum_value.name.lower() == value.lower():
+                        return enum_value
+                raise TypeError(
+                    f"Value for '{context}': '{value}' is not a valid key for enum '{field_type}', could not be found"
+                )
             elif isinstance(value, field_type) and (
                 type(value) is not bool or field_type is bool or field_type is object
             ):
@@ -670,6 +699,13 @@ def format_toml_pair(key: str, value: object) -> str:
 def _to_toml_pair(value: object) -> tuple[str | None, Any]:
     """Return a TOML-compatible suffix and value pair with the data from the given rich value object."""
     match value:
+        # enums have to be checked before basic types because for instance
+        # IntEnum is also of type int
+        case Enum():
+            if isinstance(value, ReprEnum):
+                return None, value.value
+            else:
+                return None, value.name.lower()
         case str() | int() | float() | date() | time() | Path():  # note: 'bool' is a subclass of 'int'
             return None, value
         case timedelta():

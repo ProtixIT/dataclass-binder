@@ -5,6 +5,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, dataclass, field
 from datetime import date, datetime, time, timedelta
+from enum import Enum, IntEnum
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType
@@ -1084,3 +1085,144 @@ def test_bind_merge() -> None:
     assert merged_config.flag is True
     assert merged_config.nested1.value == "sun"
     assert merged_config.nested2.value == "cheese"
+
+
+class Color(Enum):
+    RED = "#FF0000"
+    GREEN = "#00FF00"
+    BLUE = "#0000FF"
+
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+    THREE = 3
+
+
+class Weekday(Enum):
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THURSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
+
+@dataclass
+class EnumEntry:
+    name: str
+    color: Color
+    number: Number
+
+
+def test_enums() -> None:
+    @dataclass
+    class Config:
+        best_colors: list[Color]
+        best_numbers: list[Number]
+        entries: list[EnumEntry]
+
+    with stream_text(
+        """
+        best-colors = ["red", "green", "blue"]
+        best-numbers = [1, 2, 3]
+
+        [[entries]]
+        name = "Entry 1"
+        color = "blue"
+        number = 2
+
+        [[entries]]
+        name = "Entry 2"
+        color = "red"
+        number = 1
+        """
+    ) as stream:
+        config = Binder(Config).parse_toml(stream)
+
+    assert len(config.best_colors) == 3
+    assert len(config.best_numbers) == 3
+    assert config.best_colors.index(Color.RED) == 0
+    assert config.best_colors.index(Color.GREEN) == 1
+    assert config.best_colors.index(Color.BLUE) == 2
+    assert all(num in config.best_numbers for num in Number)
+    assert len(config.entries) == 2
+    assert config.entries[0].color is Color.BLUE
+    assert config.entries[0].number is Number.TWO
+    assert config.entries[1].color is Color.RED
+    assert config.entries[1].number is Number.ONE
+
+
+def test_enum_with_invalid_value() -> None:
+    @dataclass
+    class UserFavorites:
+        favorite_number: Number
+        favorite_color: Color
+
+    with stream_text(
+        """
+        favorite-number = "one"
+        favorite-color = "red"
+        """
+    ) as stream, pytest.raises(TypeError):
+        Binder(UserFavorites).parse_toml(stream)
+
+
+def test_enum_keys_being_case_insensitive() -> None:
+    @dataclass
+    class Theme:
+        primary: Color
+        secondary: Color
+        accent: Color
+
+    with stream_text(
+        """
+        primary = "RED"
+        secondary = "green"
+        accent = "blUE"
+        """
+    ) as stream:
+        theme = Binder(Theme).parse_toml(stream)
+
+    assert theme.primary is Color.RED
+    assert theme.secondary is Color.GREEN
+    assert theme.accent is Color.BLUE
+
+
+def test_key_based_enum_while_using_value_ident() -> None:
+    @dataclass
+    class UserColorPreference:
+        primary: Color
+        secondary: Color
+
+    with stream_text(
+        """
+        primary = "#FF0000"
+        seconadry = "blue"
+        """
+    ) as stream, pytest.raises(TypeError):
+        Binder(UserColorPreference).parse_toml(stream)
+
+
+def test_enum_parsing_with_invalid_key_type() -> None:
+    @dataclass
+    class UserPrefs:
+        name: str
+        start_of_the_week: Weekday
+
+    with stream_text(
+        """
+        name = "Peter Testuser"
+        start-of-the-week = "sunday"
+        """
+    ) as stream:
+        Binder(UserPrefs).parse_toml(stream)
+
+    with stream_text(
+        """
+        name = "Peter Testuser"
+        start-of-the-week = 1
+        """
+    ) as stream, pytest.raises(TypeError):
+        Binder(UserPrefs).parse_toml(stream)
