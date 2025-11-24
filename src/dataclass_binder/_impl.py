@@ -211,7 +211,6 @@ T = TypeVar("T")
 
 @dataclass(slots=True)
 class _ClassInfo(Generic[T]):
-
     _cache: ClassVar[MutableMapping[type[Any], _ClassInfo[Any]]] = WeakKeyDictionary()
 
     dataclass: type[T]
@@ -271,12 +270,10 @@ class Binder(Generic[T]):
         return cls(dataclass)
 
     @overload
-    def __init__(self, class_or_instance: type[T]) -> None:
-        ...
+    def __init__(self, class_or_instance: type[T]) -> None: ...
 
     @overload
-    def __init__(self, class_or_instance: T) -> None:
-        ...
+    def __init__(self, class_or_instance: T) -> None: ...
 
     def __init__(self, class_or_instance: type[T] | T) -> None:
         if isinstance(class_or_instance, type):
@@ -569,12 +566,10 @@ class Binder(Generic[T]):
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
 
         @classmethod
-        def bind(cls, data: Mapping[str, Any]) -> T:
-            ...
+        def bind(cls, data: Mapping[str, Any]) -> T: ...
 
         @classmethod
-        def parse_toml(cls, file: BinaryIO | str | Path) -> T:
-            ...
+        def parse_toml(cls, file: BinaryIO | str | Path) -> T: ...
 
     else:
 
