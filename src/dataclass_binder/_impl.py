@@ -324,7 +324,7 @@ class Binder(Generic[T]):
         elif issubclass(origin, Mapping):
             if not isinstance(value, dict):
                 raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
-            key_type, elem_type = get_args(field_type)
+            _key_type, elem_type = get_args(field_type)
             mapping = {
                 key: self._bind_to_field(elem, elem_type, None, f'{context}["{key}"]') for key, elem in value.items()
             }
@@ -507,7 +507,7 @@ class Binder(Generic[T]):
             origin = get_origin(field_type)
             if origin is not None:
                 if issubclass(origin, Mapping):
-                    key_type, value_type = get_args(field_type)
+                    _key_type, value_type = get_args(field_type)
                     if isinstance(value_type, Binder):
                         if value is None:
                             nested_map = {f"{key_fmt}.<name>": None}
