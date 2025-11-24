@@ -100,9 +100,9 @@ EXAMPLE_NATIVE_VALUES = (
     "\"both\" 'quotes'",
     "embedded\nnewline",
     r"back\slash",
-    'I\'m a string. "You can quote me". Name\tJos\u00E9\nLocation\tSF.',
-    "complex string with back\\slash, \"both\" 'quotes' and \u0000control\u007Fchars\u0007",
-    "\U0001F44D",
+    'I\'m a string. "You can quote me". Name\tJos\u00e9\nLocation\tSF.',
+    "complex string with back\\slash, \"both\" 'quotes' and \u0000control\u007fchars\u0007",
+    "\U0001f44d",
     date(2022, 10, 5),
     datetime(2022, 10, 5, 19, 16, 29),
     time(19, 16, 29),
@@ -240,9 +240,9 @@ def test_format_value_nested_dataclass(*, optional: bool, string: bool) -> None:
 
 
 def test_format_value_unsupported_type() -> None:
-    with pytest.raises(TypeError, match="^NoneType$"):
+    with pytest.raises(TypeError, match=r"^NoneType$"):
         format_toml_pair("unsupported", None)
-    with pytest.raises(TypeError, match="^NoneType$"):
+    with pytest.raises(TypeError, match=r"^NoneType$"):
         list(_iter_format_value(None))
 
 
@@ -821,7 +821,7 @@ value = 7
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sourceless_class() -> type[Any]:
     """A class for which no source code is available."""
 

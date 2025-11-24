@@ -26,24 +26,17 @@ pre-commit = "^4.5.0"
 mypy = "^1.5"
 pytest = "^7.2.0"
 pytest-cov = "^4.0.0"
-ruff = "0.0.274"
+ruff = "0.14.6"
 
 [tool.poetry.group.coverage.dependencies]
 coverage = {version = "^7.0.0", extras = ["toml"]}
-
-[tool.black]
-line-length = 120
-target-version = ["py310"]
-
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 120
 
 [tool.ruff]
 line-length = 120
 target-version = "py310"
 src = ["src"]
+
+[tool.ruff.lint]
 select = [
     "F", "E", "W", "I", "N", "UP", "ANN0", "ANN2", "FBT", "B", "A", "C4", "FA",
     "ISC", "ICN", "G", "INP", "PIE", "T20", "PT", "Q", "RSE", "RET", "SIM",
@@ -56,6 +49,9 @@ ignore = [
     "TRY003",  # maybe in the future
     "TRY301",  # alternatives might be worse
 ]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
 
 [tool.mypy]
 disallow_incomplete_defs = true

@@ -187,7 +187,7 @@ def _get_fields(cls: type) -> Iterator[tuple[Field, type]]:
                 continue
             if isinstance(annotation, str):
                 try:
-                    annotation = eval(annotation, cls_globals, cls_locals)  # noqa: PGH001
+                    annotation = eval(annotation, cls_globals, cls_locals)
                 except NameError as ex:
                     raise TypeError(f"Failed to parse annotation of field '{cls.__name__}.{name}': {ex}") from None
             yield field, annotation
@@ -211,7 +211,6 @@ T = TypeVar("T")
 
 @dataclass(slots=True)
 class _ClassInfo(Generic[T]):
-
     _cache: ClassVar[MutableMapping[type[Any], _ClassInfo[Any]]] = WeakKeyDictionary()
 
     dataclass: type[T]
@@ -260,7 +259,8 @@ class Binder(Generic[T]):
     Binds TOML data to a specific dataclass.
     """
 
-    __slots__ = ("_dataclass", "_instance", "_class_info")
+    __slots__ = "_class_info", "_dataclass", "_instance"
+
     _dataclass: type[T]
     _instance: T | None
     _class_info: _ClassInfo[T]
@@ -270,12 +270,10 @@ class Binder(Generic[T]):
         return cls(dataclass)
 
     @overload
-    def __init__(self, class_or_instance: type[T]) -> None:
-        ...
+    def __init__(self, class_or_instance: type[T]) -> None: ...
 
     @overload
-    def __init__(self, class_or_instance: T) -> None:
-        ...
+    def __init__(self, class_or_instance: T) -> None: ...
 
     def __init__(self, class_or_instance: type[T] | T) -> None:
         if isinstance(class_or_instance, type):
@@ -323,7 +321,7 @@ class Binder(Generic[T]):
         elif issubclass(origin, Mapping):
             if not isinstance(value, dict):
                 raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
-            key_type, elem_type = get_args(field_type)
+            _key_type, elem_type = get_args(field_type)
             mapping = {
                 key: self._bind_to_field(elem, elem_type, None, f'{context}["{key}"]') for key, elem in value.items()
             }
@@ -506,7 +504,7 @@ class Binder(Generic[T]):
             origin = get_origin(field_type)
             if origin is not None:
                 if issubclass(origin, Mapping):
-                    key_type, value_type = get_args(field_type)
+                    _key_type, value_type = get_args(field_type)
                     if isinstance(value_type, Binder):
                         if value is None:
                             nested_map = {f"{key_fmt}.<name>": None}
@@ -568,12 +566,10 @@ class Binder(Generic[T]):
         # These definitions exist to support the deprecated `Binder[DC]` syntax in mypy.
 
         @classmethod
-        def bind(cls, data: Mapping[str, Any]) -> T:
-            ...
+        def bind(cls, data: Mapping[str, Any]) -> T: ...
 
         @classmethod
-        def parse_toml(cls, file: BinaryIO | str | Path) -> T:
-            ...
+        def parse_toml(cls, file: BinaryIO | str | Path) -> T: ...
 
     else:
 
