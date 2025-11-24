@@ -48,7 +48,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
     """
     origin = get_origin(field_type)
     if origin is None:
-        if field_type is Any:  # type: ignore[comparison-overlap]
+        if field_type is Any:
             return object
         elif not isinstance(field_type, type):
             raise TypeError(f"Annotation for field '{context}' is not a type")
@@ -94,7 +94,7 @@ def _collect_type(field_type: type, context: str) -> type | Binder[Any]:
             else:
                 return origin[tuple(_collect_type(arg, arg_context) for arg in args)]  # type: ignore[no-any-return]
         # Use the convention that the first argument is the element type.
-        return origin[_collect_type(args[0], arg_context)]  # type: ignore[no-any-return]
+        return origin[_collect_type(args[0], arg_context)]
     elif origin is type:
         try:
             (arg,) = get_args(field_type)
