@@ -870,7 +870,7 @@ def get_field_docstrings(dataclass: type[Any]) -> Mapping[str, str]:
         match node:
             case ast.AnnAssign(target=ast.Name(id=name)):
                 scope = name
-            case ast.Expr(value=ast.Constant(value=docstring)):
+            case ast.Expr(value=ast.Constant(value=str(docstring))):
                 if scope is None:
                     # When using 'scope is not None', Coverage 6.4.4 will consider the 'is None' branch uncovered.
                     pass
