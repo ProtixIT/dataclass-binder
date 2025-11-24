@@ -821,7 +821,7 @@ value = 7
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def sourceless_class() -> type[Any]:
     """A class for which no source code is available."""
 

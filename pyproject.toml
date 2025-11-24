@@ -26,7 +26,7 @@ pre-commit = "^4.5.0"
 mypy = "^1.5"
 pytest = "^7.2.0"
 pytest-cov = "^4.0.0"
-ruff = "0.0.274"
+ruff = "0.14.6"
 
 [tool.poetry.group.coverage.dependencies]
 coverage = {version = "^7.0.0", extras = ["toml"]}

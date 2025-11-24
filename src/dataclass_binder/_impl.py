@@ -187,7 +187,7 @@ def _get_fields(cls: type) -> Iterator[tuple[Field, type]]:
                 continue
             if isinstance(annotation, str):
                 try:
-                    annotation = eval(annotation, cls_globals, cls_locals)  # noqa: PGH001
+                    annotation = eval(annotation, cls_globals, cls_locals)
                 except NameError as ex:
                     raise TypeError(f"Failed to parse annotation of field '{cls.__name__}.{name}': {ex}") from None
             yield field, annotation
