@@ -436,7 +436,7 @@ class Binder(Generic[T]):
         else:
             return replace(instance, **parsed)  # type: ignore[type-var]
 
-    def format_toml(self) -> Iterator[str]:
+    def format_toml(self, context: str = "") -> Iterator[str]:
         """
         Yield lines of TOML text for populating the dataclass or object that we are binding to.
 
@@ -444,11 +444,14 @@ class Binder(Generic[T]):
 
         If we are binding to a class, example values for mandatory fields will be derived from the field types;
         these example values can be syntactically incorrect placeholders.
+
+        The `context` parameter contains a dot-separated key path for the bound object/class:
+        this will be prefixed to all yielded TOML table names.
         """
 
-        return self._format_toml_root(template=False)
+        return self._format_toml_root(context=context, template=False)
 
-    def format_toml_template(self) -> Iterator[str]:
+    def format_toml_template(self, context: str = "") -> Iterator[str]:
         """
         Yield lines of TOML text as a template for populating the dataclass or object that we are binding to.
 
@@ -457,12 +460,15 @@ class Binder(Generic[T]):
 
         If we are binding to an object, values from that object will be used to populate the template.
         If we are binding to a class, example values will be derived from the field types.
+
+        The `context` parameter contains a dot-separated key path for the bound object/class:
+        this will be prefixed to all yielded TOML table names.
         """
 
-        return self._format_toml_root(template=True)
+        return self._format_toml_root(context=context, template=True)
 
-    def _format_toml_root(self, *, template: bool) -> Iterator[str]:
-        table = Table(self, "", self._instance, None)
+    def _format_toml_root(self, *, context: str, template: bool) -> Iterator[str]:
+        table = Table(self, context, self._instance, None)
         lines = table.format_table(set(), template=template)
         for line in lines:
             if line:

@@ -231,12 +231,37 @@ class Inner:
     behind_the_curtain: str = field(init=False, default="wizard")
 
 
+@dataclass(kw_only=True)
+class Outer:
+    top_level: int
+    nested: Inner
+
+
 @pytest.mark.parametrize("optional", (True, False))
 @pytest.mark.parametrize("string", (True, False))
 def test_format_value_nested_dataclass(*, optional: bool, string: bool) -> None:
     dc = single_value_dataclass(Inner, optional=optional, string=string)
     value = Inner(key_containing_underscores=True, maybesuffix=timedelta(days=2))
     assert round_trip_value(value, dc) == value
+
+
+@pytest.mark.parametrize(
+    ("context", "expected_headers"),
+    [
+        ("", ["[nested]"]),
+        ("one", ["[one]", "[one.nested]"]),
+        ("one.two", ["[one.two]", "[one.two.nested]"]),
+    ],
+)
+def test_format_value_context(context: str, expected_headers: list[str]) -> None:
+    obj = Outer(top_level=123, nested=Inner(key_containing_underscores=True, maybesuffix=timedelta(days=2)))
+
+    lines = list(Binder(obj).format_toml_template(context=context))
+    toml = "\n".join(lines)
+    print(toml)  # noqa: T201
+
+    actual_headers = [line for line in lines if line.startswith("[")]
+    assert actual_headers == expected_headers
 
 
 def test_format_value_unsupported_type() -> None:
