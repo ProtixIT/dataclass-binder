@@ -260,7 +260,8 @@ class Binder(Generic[T]):
     Binds TOML data to a specific dataclass.
     """
 
-    __slots__ = ("_dataclass", "_instance", "_class_info")
+    __slots__ = "_class_info", "_dataclass", "_instance"
+
     _dataclass: type[T]
     _instance: T | None
     _class_info: _ClassInfo[T]
