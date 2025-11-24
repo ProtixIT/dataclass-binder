@@ -659,7 +659,7 @@ def test_bind_timedelta_direct() -> None:
             duration = false
             """
         ) as stream,
-        pytest.raises(TypeError, match="^Value for 'TimeDeltaConfig.duration' has type 'bool', expected time$"),
+        pytest.raises(TypeError, match=r"^Value for 'TimeDeltaConfig.duration' has type 'bool', expected time$"),
     ):
         Binder(TimeDeltaConfig).parse_toml(stream)
 
@@ -693,7 +693,7 @@ def test_bind_timedelta_suffix() -> None:
         ) as stream,
         pytest.raises(
             TypeError,
-            match="^Value for 'TimeDeltaConfig.duration' with suffix 'weeks' has type 'bool', expected number$",
+            match=r"^Value for 'TimeDeltaConfig.duration' with suffix 'weeks' has type 'bool', expected number$",
         ),
     ):
         Binder(TimeDeltaConfig).parse_toml(stream)

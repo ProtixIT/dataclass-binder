@@ -240,9 +240,9 @@ def test_format_value_nested_dataclass(*, optional: bool, string: bool) -> None:
 
 
 def test_format_value_unsupported_type() -> None:
-    with pytest.raises(TypeError, match="^NoneType$"):
+    with pytest.raises(TypeError, match=r"^NoneType$"):
         format_toml_pair("unsupported", None)
-    with pytest.raises(TypeError, match="^NoneType$"):
+    with pytest.raises(TypeError, match=r"^NoneType$"):
         list(_iter_format_value(None))
 
 
