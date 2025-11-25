@@ -436,7 +436,7 @@ class Binder(Generic[T]):
         else:
             return replace(instance, **parsed)  # type: ignore[type-var]
 
-    def format_toml(self, context: str = "") -> Iterator[str]:
+    def format_toml(self, *, context: str = "") -> Iterator[str]:
         """
         Yield lines of TOML text for populating the dataclass or object that we are binding to.
 
@@ -451,7 +451,7 @@ class Binder(Generic[T]):
 
         return self._format_toml_root(context=context, template=False)
 
-    def format_toml_template(self, context: str = "") -> Iterator[str]:
+    def format_toml_template(self, *, context: str = "") -> Iterator[str]:
         """
         Yield lines of TOML text as a template for populating the dataclass or object that we are binding to.
 

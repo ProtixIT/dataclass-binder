@@ -598,3 +598,8 @@ In version 0.3.0, the function `format_template()` has been replaced by the meth
 ### 0.3.4 - 2023-08-18:
 
 - Support `pathlib.Path` as a field annotation ([#40](https://github.com/ProtixIT/dataclass-binder/issues/40))
+
+### 0.3.5 - 2025-11-25:
+
+- Support TOML formatting with a non-empty context ([#52](https://github.com/ProtixIT/dataclass-binder/pull/52))
+- Ignore class-level constants that are not strings when looking for field docstrings ([e18818cb](https://github.com/ProtixIT/dataclass-binder/commit/e18818cb))
