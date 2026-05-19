@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timedelta
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType, NoneType, UnionType
-from typing import Any, TypeVar, Union, cast, get_args, get_origin
+from typing import Any, Literal, TypeVar, Union, cast, get_args, get_origin
 
 import pytest
 
@@ -319,6 +319,8 @@ class TemplateConfig:
 
     multi_type: str | int
 
+    literal: Literal["foo", 3, True]
+
     derived: int = field(init=False)
     """Excluded field."""
 
@@ -365,6 +367,9 @@ certificate = '/path/to/dir_or_file'
 
 # Mandatory.
 multi-type = '???' | 0
+
+# Mandatory.
+literal = 'foo' | 3 | true
 """.strip()
     )
 
@@ -392,6 +397,7 @@ def test_format_dataclass_inline(*, optional: bool, string: bool) -> None:
         expiry=timedelta(days=3),
         certificate=Path("secrets/copper.key"),
         multi_type=-1,
+        literal=3,
     )
     formatted = format_toml_pair("value", value)
     assert formatted == (
@@ -403,7 +409,8 @@ def test_format_dataclass_inline(*, optional: bool, string: bool) -> None:
         "another-number = 0.5, "
         "expiry-days = 3, "
         "certificate = 'secrets/copper.key', "
-        "multi-type = -1}"
+        "multi-type = -1, "
+        "literal = 3}"
     )
     dc = single_value_dataclass(TemplateConfig, optional=optional, string=string)
     assert parse_toml(dc, formatted).value == value

@@ -8,7 +8,7 @@ from datetime import date, datetime, time, timedelta
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType
-from typing import Any, BinaryIO, Generic, TypeVar
+from typing import Any, BinaryIO, Generic, Literal, TypeVar
 
 import pytest
 
@@ -526,6 +526,39 @@ def test_bind_nested_tuple() -> None:
 
     assert config.nested == (("abc", 2), (True, "def"))
 
+@dataclass(frozen=True)
+class LiteralConfig:
+    magic_word: Literal["abracadabra", "opensesame"]
+
+def test_bind_literal() -> None:
+    """typing.Literal is a valid field type"""
+
+    for word in ["abracadabra", "opensesame"]:
+        with stream_text(
+                f"""
+                magic-word = "{word}"
+                """
+            ) as stream:
+            config = Binder(LiteralConfig).parse_toml(stream)
+
+        assert config.magic_word == word
+
+def test_bind_invalid_literal() -> None:
+    """invalid values of typing.Literal are not accepted"""
+
+    with (
+        stream_text(
+            """
+            magic-word = "dooverlacky"
+            """
+        ) as stream,
+        pytest.raises(
+            TypeError,
+            match=r"^Value for 'LiteralConfig.magic_word' has value 'dooverlacky', "
+                   "expected one of 'abracadabra', 'opensesame'$",
+        ),
+    ):
+        Binder(LiteralConfig).parse_toml(stream)
 
 @dataclass(frozen=True)
 class MappingConfig:
