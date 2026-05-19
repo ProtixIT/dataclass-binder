@@ -25,7 +25,20 @@ from inspect import cleandoc, get_annotations, getmodule, getsource, isabstract
 from pathlib import Path
 from textwrap import dedent
 from types import GenericAlias, MappingProxyType, ModuleType, NoneType, UnionType
-from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, Generic, TypeVar, Union, cast, get_args, get_origin, overload
+from typing import (
+        TYPE_CHECKING,
+        Any,
+        BinaryIO,
+        ClassVar,
+        Generic,
+        Literal,
+        TypeVar,
+        Union,
+        cast,
+        get_args,
+        get_origin,
+        overload,
+        )
 from weakref import WeakKeyDictionary
 
 if sys.version_info < (3, 11):
@@ -75,6 +88,8 @@ def _collect_type(field_type: type, context: str) -> type | GenericAlias | Binde
             return collected_types[0]
         else:
             return reduce(operator.__or__, collected_types)
+    elif origin is Literal:
+        return field_type
     elif issubclass(origin, Mapping):
         type_args = get_args(field_type)
         try:
@@ -318,6 +333,11 @@ class Binder(Generic[T]):
                 type(value) is not bool or field_type is bool or field_type is object
             ):
                 return value
+        elif origin is Literal:
+            if value not in get_args(field_type):
+                valid_args = map(repr, get_args(field_type))
+                raise TypeError(f"Value for '{context}' has value '{value}', expected one of {', '.join(valid_args)}")
+            return value
         elif issubclass(origin, Mapping):
             if not isinstance(value, dict):
                 raise TypeError(f"Value for '{context}' has type '{type(value).__name__}', expected table")
@@ -509,7 +529,9 @@ class Binder(Generic[T]):
                 continue
             origin = get_origin(field_type)
             if origin is not None:
-                if issubclass(origin, Mapping):
+                if origin is Literal:
+                    pass
+                elif issubclass(origin, Mapping):
                     _key_type, value_type = get_args(field_type)
                     if isinstance(value_type, Binder):
                         if value is None:
@@ -887,6 +909,15 @@ def format_template(class_or_instance: Any) -> Iterator[str]:
     """Deprecated: use `Binder.format_toml_template()` instead."""
     yield from Binder(class_or_instance).format_toml_template()
 
+def _format_literal(literal: Any) -> str:
+    if isinstance(literal, str):
+        return f"'{literal}'"
+    elif isinstance(literal, bool):
+        return str(literal).lower()
+    elif isinstance(literal, int):
+        return str(literal)
+    else:
+        raise TypeError(f"Can't represent '{literal}' as a TOML constant")
 
 def _format_value_for_type(field_type: GenericAlias | type[Any]) -> str:
     origin = get_origin(field_type)
@@ -914,6 +945,8 @@ def _format_value_for_type(field_type: GenericAlias | type[Any]) -> str:
             raise AssertionError(field_type)
     elif origin in (UnionType, Union):
         return " | ".join(_format_value_for_type(arg) for arg in get_args(field_type))
+    elif origin is Literal:
+        return " | ".join(_format_literal(arg) for arg in get_args(field_type))
     elif issubclass(origin, Mapping):
         return "{}"
     elif issubclass(origin, Iterable):

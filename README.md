@@ -168,6 +168,15 @@ class Config:
 The `float` type can be used to bind floating point numbers.
 Support for `Decimal` is not there at the moment but would be relatively easy to add, as `tomllib`/`tomli` has an option for that.
 
+Where only one of a specific set of values is permitted, `typing.Literal` can be used, which supports any combination of strings, ints and bools:
+
+```py
+@dataclass
+class Config:
+    mode: Literal["boring", "fancy", "mid"]
+    limbs: Literal[0, 1, 2, 3, 4, 5]
+```
+
 ### Defaults
 
 Fields can be made optional by assigning a default value. Using `None` as a default value is allowed too:
